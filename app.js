@@ -2838,6 +2838,7 @@ function calculateTechnicalRecommendation() {
       const circuits = Math.max(1, Math.ceil(pipeLength / maxCircuitLength));
       const heatLoad = area * heatLoadPerM2;
       const flowRate = heatLoad / (1.163 * deltaT);
+      const flowRatePerCircuit = circuits > 0 ? flowRate / circuits : 0;
       const floorCovering = room.floorCovering || 'Fliesen';
       const floorCoveringFactor = getFloorCoveringFactor(floorCovering);
       const screedCoverFactor = getScreedCoverFactor();
@@ -2858,6 +2859,7 @@ function calculateTechnicalRecommendation() {
         circuits,
         heatLoad,
         flowRate,
+        flowRatePerCircuit,
         floorCovering,
         heatEmissionFactor
       });
@@ -3000,6 +3002,7 @@ function renderTechnicalRecommendation() {
             <th>HK</th>
             <th>Heizlast</th>
             <th>Volumenstrom</th>
+            <th>je HK</th>
             <th>Bodenbelag</th>
             <th>Faktor</th>
           </tr>
@@ -3015,6 +3018,7 @@ function renderTechnicalRecommendation() {
               <td>${room.circuits}</td>
               <td>ca. ${formatQuantity(room.heatLoad)} W</td>
               <td>ca. ${formatQuantity(room.flowRate)} l/h</td>
+              <td>ca. ${formatQuantity(room.flowRatePerCircuit)} l/h</td>
               <td>${room.floorCovering}</td>
               <td>${formatQuantity(room.heatEmissionFactor)}</td>
             </tr>
@@ -3022,6 +3026,13 @@ function renderTechnicalRecommendation() {
         </tbody>
       </table>
     </div>
+    <div class="technical-note">
+  <strong>Hinweis zum hydraulischen Abgleich:</strong>
+  Die angegebenen Werte „je HK“ dienen als überschlägige Einstellempfehlung am Heizkreisverteiler.
+  Eine verbindliche Ventilvoreinstellung und hydraulische Berechnung unter Berücksichtigung von
+  Rohrlängen, Druckverlusten, Armaturen, Pumpenkennlinie und Verteilerkomponenten kann separat
+  beauftragt werden.
+</div>
   `;
 }
 
