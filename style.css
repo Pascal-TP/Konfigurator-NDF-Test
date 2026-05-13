@@ -574,7 +574,8 @@ button:disabled {
   width: 18px;
   height: 18px;
   min-height: auto;
-  transform: scale(1.2); /* WICHTIG */
+  transform: scale(1.2);
+  /* WICHTIG */
   transform-origin: center;
   margin-top: 2px;
 }
@@ -1177,7 +1178,8 @@ button.disabled-button:hover {
 
 /* Schritt 9 – Checkboxen sauber ausrichten */
 .step-panel[data-step-panel="9"] .check-option {
-  align-items: flex-start; /* Text beginnt oben */
+  align-items: flex-start;
+  /* Text beginnt oben */
 }
 
 .step-panel[data-step-panel="9"] .check-option input[type="checkbox"] {
@@ -1190,7 +1192,8 @@ button.disabled-button:hover {
   transform: scale(1.2);
   transform-origin: center;
 
-  margin-top: 3px; /* Feintuning für mehrzeiligen Text */
+  margin-top: 3px;
+  /* Feintuning für mehrzeiligen Text */
 }
 
 /* Frässystem – Checkboxen sauber ausrichten */
@@ -1218,10 +1221,92 @@ button.disabled-button:hover {
 
 .release-label {
   position: absolute;
-  top: -18px;    
+  top: -18px;
   right: 4px;
-  font-size: 11px; 
-  color: rgba(0,0,0,0.7);
-  font-weight: 400; 
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.7);
+  font-weight: 400;
   letter-spacing: 0.3px;
+}
+
+.technical-result-box {
+  margin-top: 14px;
+}
+
+.technical-result-box h3 {
+  margin: 18px 0 10px;
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.technical-note {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  border-radius: 12px;
+  padding: 12px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+.technical-note.warning {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.technical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.technical-grid div {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.technical-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.technical-grid strong {
+  color: var(--primary);
+}
+
+.technical-table-wrap {
+  overflow-x: auto;
+}
+
+.technical-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.technical-table th,
+.technical-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 9px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.technical-table th {
+  background: #f8fafc;
+  color: var(--primary);
+}
+
+@media (max-width: 720px) {
+  .technical-grid {
+    grid-template-columns: 1fr;
+  }
 }

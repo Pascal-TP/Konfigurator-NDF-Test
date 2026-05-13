@@ -107,6 +107,7 @@ const extraInsulationPointerFloor = document.getElementById('extraInsulationPoin
 const extraInsulationPointerRoom = document.getElementById('extraInsulationPointerRoom');
 const manualDistanceBox = document.getElementById('manualDistanceBox');
 const manualDistanceKmInput = document.getElementById('manualDistanceKm');
+const technicalCalculationResult = document.getElementById('technicalCalculationResult');
 
 const appModal = document.getElementById('appModal');
 const modalTitle = document.getElementById('modalTitle');
@@ -2660,6 +2661,193 @@ function roomHasSpacing(room, spacing) {
   return roomIsHeated(room) && room.spacing === spacing;
 }
 
+const TECHNICAL_DEFAULTS = {
+  neubau: {
+    heatLoadPerM2: 45,
+    label: 'Neubau / moderne Bauweise'
+  },
+  sanierung: {
+    heatLoadPerM2: 65,
+    label: 'Sanierung / Bestandsgebäude'
+  },
+  deltaT: 5,
+  maxCircuitLength: 100,
+  flowTemperature: {
+    'Wärmepumpe': 35,
+    'Brennwert': 40,
+    'Fernwärme': 45,
+    'Hybrid': 40,
+    'Keine Angabe': 40
+  }
+};
+
+function getPipeLengthPerM2(spacing) {
+  const map = {
+    'VA 100': 8.8,
+    'VA 150': 5.8,
+    'VA 200': 4.6
+  };
+
+  return map[spacing] || 5.8;
+}
+
+function getRecommendedDistributorSize(circuits) {
+  if (circuits <= 0) return '-';
+
+  const sizes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  const matchingSize = sizes.find(size => size >= circuits);
+
+  return matchingSize ? `${matchingSize}-fach` : `${circuits}-fach oder auf mehrere Verteiler aufteilen`;
+}
+
+function calculateTechnicalRecommendation() {
+  const projectDefaults =
+    TECHNICAL_DEFAULTS[state.projectType] || TECHNICAL_DEFAULTS.neubau;
+
+  const heatLoadPerM2 = projectDefaults.heatLoadPerM2;
+  const deltaT = TECHNICAL_DEFAULTS.deltaT;
+  const maxCircuitLength = TECHNICAL_DEFAULTS.maxCircuitLength;
+  const flowTemperature =
+    TECHNICAL_DEFAULTS.flowTemperature[state.heatSource] ||
+    TECHNICAL_DEFAULTS.flowTemperature['Keine Angabe'];
+
+  const rooms = [];
+  let totalArea = 0;
+  let totalPipeLength = 0;
+  let totalCircuits = 0;
+  let totalHeatLoad = 0;
+  let totalFlowRate = 0;
+
+  state.floors.forEach((floor, floorIndex) => {
+    floor.rooms.forEach((room, roomIndex) => {
+      if (!roomIsHeated(room)) return;
+
+      const area = getHeatedAreaForRoom(room);
+      if (area <= 0) return;
+
+      const pipeLengthPerM2 = getPipeLengthPerM2(room.spacing);
+      const pipeLength = area * pipeLengthPerM2;
+      const circuits = Math.max(1, Math.ceil(pipeLength / maxCircuitLength));
+      const heatLoad = area * heatLoadPerM2;
+      const flowRate = heatLoad / (1.163 * deltaT);
+
+      totalArea += area;
+      totalPipeLength += pipeLength;
+      totalCircuits += circuits;
+      totalHeatLoad += heatLoad;
+      totalFlowRate += flowRate;
+
+      rooms.push({
+        floor: getFloorLabel(floor, floorIndex),
+        room: getRoomLabel(room, roomIndex),
+        area,
+        spacing: room.spacing || '-',
+        pipeLength,
+        circuits,
+        heatLoad,
+        flowRate
+      });
+    });
+  });
+
+  return {
+    basis: {
+      buildingLabel: projectDefaults.label,
+      heatLoadPerM2,
+      deltaT,
+      maxCircuitLength,
+      flowTemperature,
+      heatSource: state.heatSource || 'Keine Angabe'
+    },
+    totals: {
+      totalArea,
+      totalPipeLength,
+      totalCircuits,
+      totalHeatLoad,
+      totalFlowRate,
+      distributor: getRecommendedDistributorSize(totalCircuits)
+    },
+    rooms
+  };
+}
+
+function renderTechnicalRecommendation() {
+  if (!technicalCalculationResult) return;
+
+  const result = calculateTechnicalRecommendation();
+
+  if (!result.rooms.length) {
+    technicalCalculationResult.innerHTML = `
+      <div class="technical-note warning">
+        Es wurden noch keine beheizten Räume mit Fläche gefunden.
+      </div>
+    `;
+    return;
+  }
+
+  technicalCalculationResult.innerHTML = `
+    <div class="technical-note">
+      <strong>Wichtiger Hinweis:</strong>
+      Die dargestellten Werte dienen ausschließlich der überschlägigen Vorbemessung.
+      Eine normgerechte Heizlastberechnung, Heizflächenauslegung und Berechnung für den hydraulischen
+      Abgleich kann separat beauftragt werden.
+    </div>
+
+    <h3>Grundlagen der Empfehlung</h3>
+    <div class="technical-grid">
+      <div><span>Gebäudetyp</span><strong>${result.basis.buildingLabel}</strong></div>
+      <div><span>Heizlastannahme</span><strong>ca. ${result.basis.heatLoadPerM2} W/m²</strong></div>
+      <div><span>Spreizung</span><strong>ca. ${result.basis.deltaT} K</strong></div>
+      <div><span>max. Heizkreislänge</span><strong>ca. ${result.basis.maxCircuitLength} m</strong></div>
+      <div><span>Wärmeerzeuger</span><strong>${result.basis.heatSource}</strong></div>
+      <div><span>empf. Vorlauf</span><strong>ca. ${result.basis.flowTemperature} °C</strong></div>
+    </div>
+
+    <h3>Gesamtempfehlung</h3>
+    <div class="technical-grid">
+      <div><span>beheizte Fläche</span><strong>${formatQuantity(result.totals.totalArea)} m²</strong></div>
+      <div><span>Rohrlänge</span><strong>${formatQuantity(result.totals.totalPipeLength)} m</strong></div>
+      <div><span>Heizkreise</span><strong>${result.totals.totalCircuits}</strong></div>
+      <div><span>Heizlast</span><strong>ca. ${formatQuantity(result.totals.totalHeatLoad / 1000)} kW</strong></div>
+      <div><span>Volumenstrom</span><strong>ca. ${formatQuantity(result.totals.totalFlowRate)} l/h</strong></div>
+      <div><span>Verteiler</span><strong>${result.totals.distributor}</strong></div>
+    </div>
+
+    <h3>Raumweise Empfehlung</h3>
+    <div class="technical-table-wrap">
+      <table class="technical-table">
+        <thead>
+          <tr>
+            <th>Etage</th>
+            <th>Raum</th>
+            <th>Fläche</th>
+            <th>VA</th>
+            <th>Rohr</th>
+            <th>HK</th>
+            <th>Heizlast</th>
+            <th>Volumenstrom</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${result.rooms.map(room => `
+            <tr>
+              <td>${room.floor}</td>
+              <td>${room.room}</td>
+              <td>${formatQuantity(room.area)} m²</td>
+              <td>${room.spacing}</td>
+              <td>${formatQuantity(room.pipeLength)} m</td>
+              <td>${room.circuits}</td>
+              <td>ca. ${formatQuantity(room.heatLoad)} W</td>
+              <td>ca. ${formatQuantity(room.flowRate)} l/h</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function calculateProducts() {
   const products = [];
 
@@ -4389,6 +4577,14 @@ regulationQtyFields.forEach((field) => {
     updateSummary();
   });
 });
+
+const startCalculationBtn = document.getElementById('startCalculationBtn');
+
+if (startCalculationBtn) {
+  startCalculationBtn.addEventListener('click', () => {
+    renderTechnicalRecommendation();
+  });
+}
 
 state.floors = [createFloor()];
 renderProjectType();

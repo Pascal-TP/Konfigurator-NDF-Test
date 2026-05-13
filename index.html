@@ -7,7 +7,7 @@
   <title>PeterShop Konfigurator</title>
   <link rel="icon" href="./favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="style.css" />
-  <script src="./libs/jspdf.umd.min.js"></script>  
+  <script src="./libs/jspdf.umd.min.js"></script>
 </head>
 
 <body>
@@ -18,10 +18,10 @@
           <h1>Konfigurator Fußbodenheizung</h1>
           <p>Geführte Eingabemaske für die optimale Bedarfsermittlung.</p>
         </div>
-         <div class="hero-logo-wrapper">
-      <div class="release-label">Release: 1.0</div>
-      <img src="logo.png" alt="Logo" class="hero-logo" />
-    </div>
+        <div class="hero-logo-wrapper">
+          <div class="release-label">Release: 1.0</div>
+          <img src="logo.png" alt="Logo" class="hero-logo" />
+        </div>
       </div>
     </section>
 
@@ -813,10 +813,21 @@
             </div>
           </div>
 
-          <div class="summary-box calc-box"><strong>Berechnung</strong>
-            <div class="muted">Die Berechnungslogik wird im nächsten Schritt ergänzt.</div>
-            <div class="btn-group" style="margin-top: 12px;"><button type="button" id="startCalculationBtn">Berechnung
-                starten</button></div>
+          <div class="summary-box calc-box">
+            <strong>Technische Empfehlung</strong>
+
+            <div class="muted">
+              Die folgenden Werte sind überschlägige Empfehlungen auf Basis der eingegebenen Flächen,
+              Verlegeabstände und Grundannahmen.
+            </div>
+
+            <div id="technicalCalculationResult" class="technical-result-box">
+              Bitte starten Sie die Berechnung.
+            </div>
+
+            <div class="btn-group" style="margin-top: 12px;">
+              <button type="button" id="startCalculationBtn">Berechnung starten</button>
+            </div>
           </div>
         </section>
 
