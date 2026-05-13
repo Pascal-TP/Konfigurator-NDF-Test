@@ -18,7 +18,10 @@ const state = {
     heatLoadPerM2: null,
     deltaT: 5,
     maxCircuitLength: 100,
-    flowTemperature: null
+    flowTemperature: null,
+    pipeMeterVa100: 8.8,
+    pipeMeterVa150: 5.8,
+    pipeMeterVa200: 4.6
   },
   selectedSystemFloorIndex: 0,
   activeSummaryFloorIndex: 0,
@@ -125,6 +128,9 @@ const recDeltaTInput = document.getElementById('recDeltaT');
 const recMaxCircuitLengthInput = document.getElementById('recMaxCircuitLength');
 const recFlowTemperatureInput = document.getElementById('recFlowTemperature');
 const technicalCalculationResult = document.getElementById('technicalCalculationResult');
+const recPipeMeterVa100Input = document.getElementById('recPipeMeterVa100');
+const recPipeMeterVa150Input = document.getElementById('recPipeMeterVa150');
+const recPipeMeterVa200Input = document.getElementById('recPipeMeterVa200');
 
 const shopToken = new URLSearchParams(window.location.search).get('token');
 const tokenStorageKey = shopToken ? `petershop-konfigurator-token-used-${shopToken}` : '';
@@ -2718,6 +2724,9 @@ function initRecommendationInputs() {
   recDeltaTInput.value = state.recommendation.deltaT;
   recMaxCircuitLengthInput.value = state.recommendation.maxCircuitLength;
   recFlowTemperatureInput.value = state.recommendation.flowTemperature;
+  if (recPipeMeterVa100Input) recPipeMeterVa100Input.value = state.recommendation.pipeMeterVa100;
+  if (recPipeMeterVa150Input) recPipeMeterVa150Input.value = state.recommendation.pipeMeterVa150;
+  if (recPipeMeterVa200Input) recPipeMeterVa200Input.value = state.recommendation.pipeMeterVa200;
 }
 
 const TECHNICAL_DEFAULTS = {
@@ -2742,12 +2751,12 @@ const TECHNICAL_DEFAULTS = {
 
 function getPipeLengthPerM2(spacing) {
   const map = {
-    'VA 100': 8.8,
-    'VA 150': 5.8,
-    'VA 200': 4.6
+    'VA 100': Number(state.recommendation?.pipeMeterVa100) || 8.8,
+    'VA 150': Number(state.recommendation?.pipeMeterVa150) || 5.8,
+    'VA 200': Number(state.recommendation?.pipeMeterVa200) || 4.6
   };
 
-  return map[spacing] || 5.8;
+  return map[spacing] || map['VA 150'];
 }
 
 function getRecommendedDistributorSize(circuits) {
@@ -2868,6 +2877,9 @@ function renderTechnicalRecommendation() {
       <div><span>max. Heizkreislänge</span><strong>ca. ${result.basis.maxCircuitLength} m</strong></div>
       <div><span>Wärmeerzeuger</span><strong>${result.basis.heatSource}</strong></div>
       <div><span>empf. Vorlauf</span><strong>ca. ${result.basis.flowTemperature} °C</strong></div>
+      <div><span>VA 100</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa100)} m/m²</strong></div>
+      <div><span>VA 150</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa150)} m/m²</strong></div>
+      <div><span>VA 200</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa200)} m/m²</strong></div>
     </div>
 
     <h3>Gesamtempfehlung</h3>
@@ -4656,17 +4668,37 @@ if (startCalculationBtn) {
   recHeatLoadPerM2Input,
   recDeltaTInput,
   recMaxCircuitLengthInput,
-  recFlowTemperatureInput
+  recFlowTemperatureInput,
+  recPipeMeterVa100Input,
+  recPipeMeterVa150Input,
+  recPipeMeterVa200Input
 ].forEach((input) => {
   if (!input) return;
 
   input.addEventListener('input', () => {
-    state.recommendation.heatLoadPerM2 = Number(recHeatLoadPerM2Input.value) || getDefaultHeatLoadPerM2();
-    state.recommendation.deltaT = Number(recDeltaTInput.value) || 5;
-    state.recommendation.maxCircuitLength = Number(recMaxCircuitLengthInput.value) || 100;
-    state.recommendation.flowTemperature = Number(recFlowTemperatureInput.value) || getDefaultFlowTemperature();
+    state.recommendation.heatLoadPerM2 =
+      Number(recHeatLoadPerM2Input.value) || getDefaultHeatLoadPerM2();
+
+    state.recommendation.deltaT =
+      Number(recDeltaTInput.value) || 5;
+
+    state.recommendation.maxCircuitLength =
+      Number(recMaxCircuitLengthInput.value) || 100;
+
+    state.recommendation.flowTemperature =
+      Number(recFlowTemperatureInput.value) || getDefaultFlowTemperature();
+
+    state.recommendation.pipeMeterVa100 =
+      Number(recPipeMeterVa100Input.value) || 8.8;
+
+    state.recommendation.pipeMeterVa150 =
+      Number(recPipeMeterVa150Input.value) || 5.8;
+
+    state.recommendation.pipeMeterVa200 =
+      Number(recPipeMeterVa200Input.value) || 4.6;
 
     renderTechnicalRecommendation();
+    updateSummary();
     nextBtn.disabled = !canProceedToNextStep();
   });
 });
