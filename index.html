@@ -147,12 +147,47 @@
 
             <div class="form-grid three recommendation-input-grid">
               <div class="field">
-                <label for="recHeatLoadPerM2">Heizlastannahme W/m²</label>
+                <label for="recHeatLoadPerM2">
+                  Heizlastannahme W/m²
+                  <span class="info-trigger" tabindex="0">i
+                    <span class="info-tooltip">
+                      Die Heizlast beschreibt die ungefähr benötigte Heizleistung pro Quadratmeter,
+                      damit der Raum im Winter ausreichend beheizt werden kann.
+                      <br><br>
+                      Typische Richtwerte:
+                      <br>
+                      Neubau: ca. 35–50 W/m²
+                      <br>
+                      Sanierung: ca. 50–70 W/m²
+                      <br>
+                      Altbau: ca. 70–100 W/m²
+                    </span>
+                  </span>
+                </label>
                 <input id="recHeatLoadPerM2" type="number" min="1" step="1" />
               </div>
 
               <div class="field">
-                <label for="recDeltaT">Spreizung K</label>
+                <label for="recDeltaT">
+                  Spreizung K
+                  <span class="info-trigger" tabindex="0">i
+                    <span class="info-tooltip">
+                      Die Spreizung beschreibt den Temperaturunterschied zwischen Vorlauf und Rücklauf
+                      der Fußbodenheizung.
+                      <br><br>
+                      Beispiel:
+                      <br>
+                      Vorlauf 35 °C
+                      <br>
+                      Rücklauf 30 °C
+                      <br>
+                      = Spreizung 5 K
+                      <br><br>
+                      Eine kleinere Spreizung benötigt meist einen höheren Volumenstrom,
+                      sorgt jedoch häufig für eine gleichmäßigere Wärmeverteilung.
+                    </span>
+                  </span>
+                </label>
                 <input id="recDeltaT" type="number" min="1" step="0.5" />
               </div>
 
