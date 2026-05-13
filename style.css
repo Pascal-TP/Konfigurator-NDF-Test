@@ -1326,13 +1326,42 @@ button.disabled-button:hover {
   color: #ffffff !important;
 }
 
+/* Info-i in den Kacheln der technischen Empfehlung sauber ausrichten */
 .technical-grid > div > span {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
 }
 
-.technical-grid .info-trigger {
-  margin-left: 0;
-  vertical-align: middle;
+.technical-grid > div > span > .info-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+
+  padding: 0 !important;
+  margin-left: 8px !important;
+
+  border-radius: 50% !important;
+  background: #dbe7f1 !important;
+  color: #0b2a4a !important;
+
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  flex: 0 0 20px !important;
+}
+
+.technical-grid .info-tooltip {
+  display: block !important;
+  color: #ffffff !important;
+  text-align: left !important;
+  font-weight: 400 !important;
 }
