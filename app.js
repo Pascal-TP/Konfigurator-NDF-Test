@@ -4169,25 +4169,25 @@ function updateAssignmentPointers() {
   togglePointer(
     systemPointerFloor,
     systemPointerRoom,
-    state.currentStep === 5 && hasOpenSystemAssignments()
+    state.currentStep === 6 && hasOpenSystemAssignments()
   );
 
   togglePointer(
     thermostatPointerFloor,
     thermostatPointerRoom,
-    state.currentStep === 6 && hasOpenThermostatAssignments()
+    state.currentStep === 7 && hasOpenThermostatAssignments()
   );
 
   togglePointer(
     distributionPointerFloor,
     distributionPointerRoom,
-    state.currentStep === 7 && hasOpenDistributionAssignments()
+    state.currentStep === 8 && hasOpenDistributionAssignments()
   );
 
   togglePointer(
     extraInsulationPointerFloor,
     extraInsulationPointerRoom,
-    state.currentStep === 8 && hasOpenExtraInsulationAssignments()
+    state.currentStep === 9 && hasOpenExtraInsulationAssignments()
   );
 }
 
