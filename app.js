@@ -2966,6 +2966,8 @@ function renderTechnicalRecommendation() {
       <span class="info-tooltip">
         Berechnung: Heizlast ÷ (1,163 × Spreizung).
         Beispiel: 1.350 W ÷ (1,163 × 5 K) = ca. 232 l/h.
+
+        (1,163 Wh/(1xK) = 1 Liter Wasser transportiert bei 1 Kelvin Temperaturunterschied ca. 1,163 Wh Wärmeenergie.)
       </span>
     </span>
   </span>
