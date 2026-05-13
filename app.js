@@ -113,7 +113,6 @@ const extraInsulationPointerFloor = document.getElementById('extraInsulationPoin
 const extraInsulationPointerRoom = document.getElementById('extraInsulationPointerRoom');
 const manualDistanceBox = document.getElementById('manualDistanceBox');
 const manualDistanceKmInput = document.getElementById('manualDistanceKm');
-const technicalCalculationResult = document.getElementById('technicalCalculationResult');
 
 const appModal = document.getElementById('appModal');
 const modalTitle = document.getElementById('modalTitle');
