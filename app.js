@@ -2917,11 +2917,7 @@ function renderTechnicalRecommendation() {
       <div><span>empf. Vorlauf</span><strong>ca. ${result.basis.flowTemperature} °C</strong></div>
       <div><span>VA 100</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa100)} m/m²</strong></div>
       <div><span>VA 150</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa150)} m/m²</strong></div>
-      <div><span>VA 200</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa200)} m/m²</strong></div>
-      <div class="field">
-        <label for="recScreedCoverMm">geplante Rohrüberdeckung mm</label>
-        <input id="recScreedCoverMm" type="number" min="30" step="1" />
-      </div>
+      <div><span>VA 200</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa200)} m/m²</strong></div>      
     </div>
 
     <h3>Gesamtempfehlung</h3>
