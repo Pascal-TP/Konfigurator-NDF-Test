@@ -2761,10 +2761,17 @@ function calculateTechnicalRecommendation() {
   const projectDefaults =
     TECHNICAL_DEFAULTS[state.projectType] || TECHNICAL_DEFAULTS.neubau;
 
-  const heatLoadPerM2 = projectDefaults.heatLoadPerM2;
-  const deltaT = TECHNICAL_DEFAULTS.deltaT;
-  const maxCircuitLength = TECHNICAL_DEFAULTS.maxCircuitLength;
+  const heatLoadPerM2 =
+    Number(state.recommendation?.heatLoadPerM2) || projectDefaults.heatLoadPerM2;
+
+  const deltaT =
+    Number(state.recommendation?.deltaT) || TECHNICAL_DEFAULTS.deltaT;
+
+  const maxCircuitLength =
+    Number(state.recommendation?.maxCircuitLength) || TECHNICAL_DEFAULTS.maxCircuitLength;
+
   const flowTemperature =
+    Number(state.recommendation?.flowTemperature) ||
     TECHNICAL_DEFAULTS.flowTemperature[state.heatSource] ||
     TECHNICAL_DEFAULTS.flowTemperature['Keine Angabe'];
 
@@ -4657,6 +4664,7 @@ if (startCalculationBtn) {
     state.recommendation.flowTemperature = Number(recFlowTemperatureInput.value) || getDefaultFlowTemperature();
 
     renderTechnicalRecommendation();
+    nextBtn.disabled = !canProceedToNextStep();
   });
 });
 
