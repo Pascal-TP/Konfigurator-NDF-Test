@@ -1317,13 +1317,22 @@ button.disabled-button:hover {
   gap: 6px;
 }
 
-.technical-grid span {
+.technical-grid > div > span {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
+.technical-grid > div > span > .info-trigger {
+  margin-left: 8px;
+}
+
 .technical-grid .info-trigger {
   flex: 0 0 auto;
+}
+
+.info-tooltip,
+.info-tooltip * {
+  color: #ffffff !important;
 }
