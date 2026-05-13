@@ -14,13 +14,19 @@ const state = {
   calculatedProducts: [],
   articleCatalog: [],
   postcodeDistances: [],
+  recommendation: {
+    heatLoadPerM2: null,
+    deltaT: 5,
+    maxCircuitLength: 100,
+    flowTemperature: null
+  },
   selectedSystemFloorIndex: 0,
   activeSummaryFloorIndex: 0,
   activeSummaryRoomIndex: 0,
   isLocked: false
 };
 
-const totalSteps = 11;
+const totalSteps = 12;
 const floorsContainer = document.getElementById('floorsContainer');
 const floorTemplate = document.getElementById('floorTemplate');
 const roomTemplate = document.getElementById('roomTemplate');
@@ -114,6 +120,12 @@ const modalTitle = document.getElementById('modalTitle');
 const modalMessage = document.getElementById('modalMessage');
 const modalOkBtn = document.getElementById('modalOkBtn');
 const modalCancelBtn = document.getElementById('modalCancelBtn');
+
+const recHeatLoadPerM2Input = document.getElementById('recHeatLoadPerM2');
+const recDeltaTInput = document.getElementById('recDeltaT');
+const recMaxCircuitLengthInput = document.getElementById('recMaxCircuitLength');
+const recFlowTemperatureInput = document.getElementById('recFlowTemperature');
+const technicalCalculationResult = document.getElementById('technicalCalculationResult');
 
 const shopToken = new URLSearchParams(window.location.search).get('token');
 const tokenStorageKey = shopToken ? `petershop-konfigurator-token-used-${shopToken}` : '';
@@ -742,12 +754,22 @@ function showStep(step) {
     stepHint.textContent = requirementText;
   }
 
-  const isSystemStep = state.currentStep === 5;
-  const isThermostatStep = state.currentStep === 6;
-  const isDistributionStep = state.currentStep === 7;
-  const isExtraInsulationStep = state.currentStep === 8;
+  const isRecommendationStep = state.currentStep === 5;
+  const isSystemStep = state.currentStep === 6;
+  const isThermostatStep = state.currentStep === 7;
+  const isDistributionStep = state.currentStep === 8;
+  const isExtraInsulationStep = state.currentStep === 9;
 
   assignFloorSystemBtn.classList.toggle('hidden', !isSystemStep);
+
+  if (isRecommendationStep) {
+    initRecommendationInputs();
+    renderTechnicalRecommendation();
+  }
+
+  if (state.currentStep === 5) {
+    return true;
+  }
 
   if (assignThermostatBtn) {
     assignThermostatBtn.classList.toggle('hidden', !isThermostatStep || state.thermostatEnabled !== 'ja');
@@ -836,11 +858,11 @@ function canProceedToNextStep() {
     );
   }
 
-  if (state.currentStep === 5) {
+  if (state.currentStep === 6) {
     return allHeatedRoomsHaveSystemAssignment();
   }
 
-  if (state.currentStep === 6) {
+  if (state.currentStep === 7) {
     if (state.thermostatEnabled === 'nein') {
       return true;
     }
@@ -852,7 +874,7 @@ function canProceedToNextStep() {
     return false;
   }
 
-  if (state.currentStep === 7) {
+  if (state.currentStep === 8) {
     if (state.distributionEnabled === 'nein') {
       return true;
     }
@@ -864,7 +886,7 @@ function canProceedToNextStep() {
     return false;
   }
 
-  if (state.currentStep === 8) {
+  if (state.currentStep === 9) {
     if (state.extraInsulationEnabled === 'nein') {
       return true;
     }
@@ -2659,6 +2681,41 @@ function getHeatedAreaForRoom(room) {
 
 function roomHasSpacing(room, spacing) {
   return roomIsHeated(room) && room.spacing === spacing;
+}
+
+function getDefaultHeatLoadPerM2() {
+  if (state.projectType === 'neubau') return 45;
+  if (state.projectType === 'sanierung') return 65;
+  return 55;
+}
+
+function getDefaultFlowTemperature() {
+  const map = {
+    'Wärmepumpe': 35,
+    'Brennwert': 40,
+    'Fernwärme': 45,
+    'Hybrid': 40,
+    'Keine Angabe': 40
+  };
+
+  return map[state.heatSource] || 40;
+}
+
+function initRecommendationInputs() {
+  if (!recHeatLoadPerM2Input) return;
+
+  if (!state.recommendation.heatLoadPerM2) {
+    state.recommendation.heatLoadPerM2 = getDefaultHeatLoadPerM2();
+  }
+
+  if (!state.recommendation.flowTemperature) {
+    state.recommendation.flowTemperature = getDefaultFlowTemperature();
+  }
+
+  recHeatLoadPerM2Input.value = state.recommendation.heatLoadPerM2;
+  recDeltaTInput.value = state.recommendation.deltaT;
+  recMaxCircuitLengthInput.value = state.recommendation.maxCircuitLength;
+  recFlowTemperatureInput.value = state.recommendation.flowTemperature;
 }
 
 const TECHNICAL_DEFAULTS = {
@@ -4585,6 +4642,24 @@ if (startCalculationBtn) {
     renderTechnicalRecommendation();
   });
 }
+
+[
+  recHeatLoadPerM2Input,
+  recDeltaTInput,
+  recMaxCircuitLengthInput,
+  recFlowTemperatureInput
+].forEach((input) => {
+  if (!input) return;
+
+  input.addEventListener('input', () => {
+    state.recommendation.heatLoadPerM2 = Number(recHeatLoadPerM2Input.value) || getDefaultHeatLoadPerM2();
+    state.recommendation.deltaT = Number(recDeltaTInput.value) || 5;
+    state.recommendation.maxCircuitLength = Number(recMaxCircuitLengthInput.value) || 100;
+    state.recommendation.flowTemperature = Number(recFlowTemperatureInput.value) || getDefaultFlowTemperature();
+
+    renderTechnicalRecommendation();
+  });
+});
 
 state.floors = [createFloor()];
 renderProjectType();

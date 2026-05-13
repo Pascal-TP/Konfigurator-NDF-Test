@@ -34,12 +34,13 @@
           <div class="step-item" data-step="2"><span class="step-number">2</span><span>Wärmeerzeuger</span></div>
           <div class="step-item" data-step="3"><span class="step-number">3</span><span>Standort</span></div>
           <div class="step-item" data-step="4"><span class="step-number">4</span><span>Räume</span></div>
-          <div class="step-item" data-step="5"><span class="step-number">5</span><span>System</span></div>
-          <div class="step-item" data-step="6"><span class="step-number">6</span><span>Thermostat</span></div>
-          <div class="step-item" data-step="7"><span class="step-number">7</span><span>Verteilertechnik</span></div>
-          <div class="step-item" data-step="8"><span class="step-number">8</span><span>Zusatzdämmung</span></div>
-          <div class="step-item" data-step="9"><span class="step-number">9</span><span>Dienstleistungen</span></div>
-          <div class="step-item" data-step="10"><span class="step-number">10</span><span>Berechnung</span></div>
+          <div class="step-item" data-step="5"><span class="step-number">E</span><span>Empfehlung</span></div>
+          <div class="step-item" data-step="6"><span class="step-number">5</span><span>System</span></div>
+          <div class="step-item" data-step="7"><span class="step-number">6</span><span>Thermostat</span></div>
+          <div class="step-item" data-step="8"><span class="step-number">7</span><span>Verteilertechnik</span></div>
+          <div class="step-item" data-step="9"><span class="step-number">8</span><span>Zusatzdämmung</span></div>
+          <div class="step-item" data-step="10"><span class="step-number">9</span><span>Dienstleistungen</span></div>
+          <div class="step-item" data-step="11"><span class="step-number">10</span><span>Berechnung</span></div>
         </div>
       </aside>
 
@@ -135,6 +136,44 @@
         </section>
 
         <section class="step-panel" data-step-panel="5">
+          <h2 class="section-title">Empfehlung</h2>
+          <p class="section-subtitle">
+            Die folgenden Werte dienen als Grundlage für die überschlägige technische Empfehlung.
+            Sie können bei Bedarf angepasst werden.
+          </p>
+
+          <div class="summary-box calc-box">
+            <strong>Grundwerte der Empfehlung</strong>
+
+            <div class="form-grid three recommendation-input-grid">
+              <div class="field">
+                <label for="recHeatLoadPerM2">Heizlastannahme W/m²</label>
+                <input id="recHeatLoadPerM2" type="number" min="1" step="1" />
+              </div>
+
+              <div class="field">
+                <label for="recDeltaT">Spreizung K</label>
+                <input id="recDeltaT" type="number" min="1" step="0.5" />
+              </div>
+
+              <div class="field">
+                <label for="recMaxCircuitLength">max. Heizkreislänge m</label>
+                <input id="recMaxCircuitLength" type="number" min="1" step="1" />
+              </div>
+
+              <div class="field">
+                <label for="recFlowTemperature">empf. Vorlauf °C</label>
+                <input id="recFlowTemperature" type="number" min="20" step="1" />
+              </div>
+            </div>
+
+            <div id="technicalCalculationResult" class="technical-result-box">
+              Die Empfehlung wird automatisch aus den Raumdaten berechnet.
+            </div>
+          </div>
+        </section>
+
+        <section class="step-panel" data-step-panel="6">
           <div class="section-title-row">
             <h2 class="section-title">5. System</h2>
 
@@ -412,7 +451,7 @@
           -->
         </section>
 
-        <section class="step-panel" data-step-panel="6">
+        <section class="step-panel" data-step-panel="7">
           <div class="section-title-row">
             <h2 class="section-title">6. Thermostat</h2>
 
@@ -469,7 +508,7 @@
           </div>
         </section>
 
-        <section class="step-panel" data-step-panel="7">
+        <section class="step-panel" data-step-panel="8">
           <div class="section-title-row">
             <h2 class="section-title">7. Verteilertechnik</h2>
 
@@ -655,7 +694,7 @@
           </div>
         </section>
 
-        <section class="step-panel" data-step-panel="8">
+        <section class="step-panel" data-step-panel="9">
           <div class="section-title-row">
             <h2 class="section-title">8. Zusatzdämmung</h2>
 
@@ -760,7 +799,7 @@
               Etage hinzufügen</button></div>
         </section>
 
-        <section class="step-panel" data-step-panel="9">
+        <section class="step-panel" data-step-panel="11">
           <h2 class="section-title">9. Dienstleistungen</h2>
           <p class="section-subtitle">Zusätzliche Dienstleistungen können hier ausgewählt werden.</p>
 
@@ -787,7 +826,7 @@
           </div>
         </section>
 
-        <section class="step-panel" data-step-panel="10">
+        <section class="step-panel" data-step-panel="11">
           <h2 class="section-title">10. Berechnung starten</h2>
           <p class="section-subtitle">Erst mit diesem Button wird später die Berechnungslogik ausgelöst.</p>
           <div class="summary-box"><strong>Prüfung</strong>
