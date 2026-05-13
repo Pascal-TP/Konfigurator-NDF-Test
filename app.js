@@ -135,7 +135,7 @@ const recPipeMeterVa200Input = document.getElementById('recPipeMeterVa200');
 const recScreedCoverMmInput = document.getElementById('recScreedCoverMm');
 
 const shopToken = new URLSearchParams(window.location.search).get('token');
-const tokenStorageKey = shopToken ? `petershop-konfigurator-token-used-${shopToken}` : '';
+// const tokenStorageKey = shopToken ? `petershop-konfigurator-token-used-${shopToken}` : '';
 
 function scrollToTop() {
   window.scrollTo({
@@ -3505,29 +3505,29 @@ function lockConfigurator() {
   resultPanel.innerHTML = `
     <h2 class="section-title">Konfigurator abgeschlossen</h2>
     <p class="section-subtitle">
-      Die Artikel wurden an den PeterShop übergeben. Dieser Konfigurator kann mit diesem Token nicht erneut genutzt werden.
+      Die Artikel wurden an NDF übermittelt.
     </p>
   `;
 }
 
-function checkTokenUsageOnLoad() {
-  if (shopToken && localStorage.getItem(tokenStorageKey) === 'used') {
-    mainLayout.classList.add('result-mode');
-    document.querySelector('.steps').classList.add('hidden');
-    document.querySelector('.btn-row').classList.add('hidden');
-    document.querySelectorAll('.step-panel').forEach((panel) => panel.classList.remove('active'));
-
-    resultPanel.classList.remove('hidden');
-    resultPanel.innerHTML = `
-      <h2 class="section-title">Token bereits verwendet</h2>
-      <p class="section-subtitle">
-        Dieser Konfigurator-Link wurde bereits genutzt. Bitte starten Sie den Konfigurator erneut aus dem PeterShop.
-      </p>
-    `;
-
-    state.isLocked = true;
-  }
-}
+// function checkTokenUsageOnLoad() {
+//  if (shopToken && localStorage.getItem(tokenStorageKey) === 'used') {
+//    mainLayout.classList.add('result-mode');
+//    document.querySelector('.steps').classList.add('hidden');
+//    document.querySelector('.btn-row').classList.add('hidden');
+//    document.querySelectorAll('.step-panel').forEach((panel) => panel.classList.remove('active'));
+//
+//    resultPanel.classList.remove('hidden');
+//    resultPanel.innerHTML = `
+//      <h2 class="section-title">Token bereits verwendet</h2>
+//      <p class="section-subtitle">
+//        Dieser Konfigurator-Link wurde bereits genutzt. Bitte starten Sie den Konfigurator erneut aus dem PeterShop.
+//      </p>
+//    `;
+//
+//    state.isLocked = true;
+//  }
+//}
 
 function getRelevantAreaForHeatingSystem() {
   return state.floors.reduce((sum, floor) => {
@@ -4450,8 +4450,8 @@ backToConfigBtn.addEventListener('click', () => {
 
 handoverShopBtn.addEventListener('click', async () => {
   const confirmed = await showAppModal({
-    title: 'Übergabe an PeterShop',
-    message: 'Mit Übergabe an PeterShop werden die Artikel an den PeterShop gesendet und in Ihrem Warenkorb gelegt. Sämtliche Eingaben werden dadurch im Konfigurator entfernt. Sind Sie sicher, jetzt an den PeterShop zu übergeben?',
+    title: 'Übermitteln an NDF',
+    message: 'Mit Übermitteln an NDF werden die Artikel an NDF gesendet und Sie erhalten in wenigen Tagen ein qualifiziertes Angebot. Sämtliche Eingaben werden dadurch im Konfigurator entfernt. Sind Sie sicher, jetzt an den NDF zu übermitteln?',
     confirmText: 'Ja, übergeben',
     cancelText: 'Abbrechen'
   });
@@ -4463,7 +4463,7 @@ handoverShopBtn.addEventListener('click', async () => {
   if (productsForShop.length === 0) {
     await showAppModal({
       title: 'Keine Artikel ausgewählt',
-      message: 'Es wurde keine Position für die Übergabe an den PeterShop ausgewählt.',
+      message: 'Es wurde keine Position für die Übermittlung an NDF ausgewählt.',
       confirmText: 'OK'
     });
     return;
@@ -4474,7 +4474,7 @@ handoverShopBtn.addEventListener('click', async () => {
 
   await showAppModal({
     title: 'Übergabe erfolgreich',
-    message: 'Ihre Artikel sind an Ihren Warenkorb übergeben worden, Sie können nun dieses Fenster schließen und zu PeterShop zurückkehren.',
+    message: 'Ihre Artikel sind an NDF übermittelt worden, Sie können nun dieses Fenster schließen.',
     confirmText: 'OK'
   });
 
