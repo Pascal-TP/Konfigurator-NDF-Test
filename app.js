@@ -4130,6 +4130,145 @@ async function exportPdf() {
   pdf.setFontSize(8);
   pdf.text('Alle Preise sind unverbindliche Verrechnungspreise ohne Mehrwertsteuer.', marginLeft, y);
 
+  function addTechnicalRecommendationToPdf() {
+    const result = calculateTechnicalRecommendation();
+
+    if (!result || !result.rooms || !result.rooms.length) {
+      return;
+    }
+
+    ensureSpace(45);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(13);
+    pdf.text('Technische Empfehlung / Vorbemessung', marginLeft, y);
+    y += 8;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+
+    const hintText = pdf.splitTextToSize(
+      'Die folgenden Werte dienen ausschließlich der überschlägigen Vorbemessung. Eine normgerechte Heizlastberechnung, Heizflächenauslegung und Berechnung für den hydraulischen Abgleich kann separat beauftragt werden.',
+      175
+    );
+
+    pdf.text(hintText, marginLeft, y);
+    y += hintText.length * 4 + 6;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Grundlagen der Empfehlung', marginLeft, y);
+    y += 6;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+
+    const basisLines = [
+      `Gebäudetyp: ${result.basis.buildingLabel}`,
+      `Heizlastannahme: ca. ${result.basis.heatLoadPerM2} W/m²`,
+      `Spreizung: ca. ${result.basis.deltaT} K`,
+      `max. Heizkreislänge: ca. ${result.basis.maxCircuitLength} m`,
+      `Wärmeerzeuger: ${result.basis.heatSource}`,
+      `empf. Vorlauf: ca. ${result.basis.flowTemperature} °C`,
+      `VA 100: ca. ${formatQuantity(state.recommendation.pipeMeterVa100)} m/m²`,
+      `VA 150: ca. ${formatQuantity(state.recommendation.pipeMeterVa150)} m/m²`,
+      `VA 200: ca. ${formatQuantity(state.recommendation.pipeMeterVa200)} m/m²`
+    ];
+
+    basisLines.forEach((line) => {
+      ensureSpace(5);
+      pdf.text(line, marginLeft, y);
+      y += 4;
+    });
+
+    y += 4;
+
+    ensureSpace(30);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Gesamtempfehlung', marginLeft, y);
+    y += 6;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+
+    const totalLines = [
+      `beheizte Fläche: ${formatQuantity(result.totals.totalArea)} m²`,
+      `Rohrlänge: ${formatQuantity(result.totals.totalPipeLength)} m`,
+      `Heizkreise: ${result.totals.totalCircuits}`,
+      `Heizlast: ca. ${formatQuantity(result.totals.totalHeatLoad / 1000)} kW`,
+      `Volumenstrom: ca. ${formatQuantity(result.totals.totalFlowRate)} l/h`,
+      `Verteiler: ${result.totals.distributor}`
+    ];
+
+    totalLines.forEach((line) => {
+      ensureSpace(5);
+      pdf.text(line, marginLeft, y);
+      y += 4;
+    });
+
+    y += 6;
+
+    ensureSpace(25);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Raumweise Empfehlung', marginLeft, y);
+    y += 6;
+
+    pdf.setFontSize(7);
+    pdf.text('Etage', marginLeft, y);
+    pdf.text('Raum', 42, y);
+    pdf.text('Fläche', 78, y);
+    pdf.text('VA', 98, y);
+    pdf.text('Rohr', 113, y);
+    pdf.text('HK', 132, y);
+    pdf.text('Heizlast', 143, y);
+    pdf.text('Volumen', 165, y);
+    pdf.text('je HK', 185, y);
+    y += 3;
+    pdf.line(marginLeft, y, 195, y);
+    y += 5;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+
+    result.rooms.forEach((room) => {
+      ensureSpace(7);
+
+      pdf.text(String(room.floor || '-').slice(0, 18), marginLeft, y);
+      pdf.text(String(room.room || '-').slice(0, 18), 42, y);
+      pdf.text(`${formatQuantity(room.area)} m²`, 78, y);
+      pdf.text(room.spacing || '-', 98, y);
+      pdf.text(`${formatQuantity(room.pipeLength)} m`, 113, y);
+      pdf.text(String(room.circuits), 132, y);
+      pdf.text(`${formatQuantity(room.heatLoad)} W`, 143, y);
+      pdf.text(`${formatQuantity(room.flowRate)} l/h`, 165, y);
+      pdf.text(`${formatQuantity(room.flowRatePerCircuit || 0)} l/h`, 185, y);
+
+      y += 5;
+    });
+
+    y += 6;
+
+    ensureSpace(18);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+
+    const hydraulicHint = pdf.splitTextToSize(
+      'Hinweis zum hydraulischen Abgleich: Die Werte je HK dienen als überschlägige Einstellempfehlung am Heizkreisverteiler. Eine verbindliche Ventilvoreinstellung und hydraulische Berechnung unter Berücksichtigung von Rohrlängen, Druckverlusten, Armaturen, Pumpenkennlinie und Verteilerkomponenten kann separat beauftragt werden.',
+      175
+    );
+
+    pdf.text(hydraulicHint, marginLeft, y);
+    y += hydraulicHint.length * 4;
+  }
+
+  y += 12;
+  addTechnicalRecommendationToPdf();
+
   const pageCount = pdf.internal.getNumberOfPages();
 
   for (let i = 1; i <= pageCount; i++) {
