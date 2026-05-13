@@ -1317,17 +1317,6 @@ button.disabled-button:hover {
   gap: 6px;
 }
 
-.technical-grid > div > span {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.technical-grid > div > span > .info-trigger {
-  margin-left: 8px;
-}
-
 .technical-grid .info-trigger {
   flex: 0 0 auto;
 }
@@ -1335,4 +1324,15 @@ button.disabled-button:hover {
 .info-tooltip,
 .info-tooltip * {
   color: #ffffff !important;
+}
+
+.technical-grid > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.technical-grid .info-trigger {
+  margin-left: 0;
+  vertical-align: middle;
 }
