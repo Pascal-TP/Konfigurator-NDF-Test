@@ -768,12 +768,12 @@ function showStep(step) {
   const isDistributionStep = state.currentStep === 8;
   const isExtraInsulationStep = state.currentStep === 9;
 
-  assignFloorSystemBtn.classList.toggle('hidden', !isSystemStep);
-
   if (isRecommendationStep) {
     initRecommendationInputs();
     renderTechnicalRecommendation();
   }
+
+  assignFloorSystemBtn.classList.toggle('hidden', !isSystemStep);
 
   if (state.currentStep === 5) {
     return true;
@@ -3383,7 +3383,7 @@ function returnToConfiguration() {
   document.querySelector('.btn-row').classList.remove('hidden');
 
   // Zurück zum letzten Schritt (Berechnung)
-  showStep(9);
+  showStep(11);
 
   scrollToTop();
 }
@@ -4274,8 +4274,8 @@ document.querySelectorAll('#thermostatToggleChoices .choice-card').forEach((card
       updateAssignmentPointers();
       updateSummary();
 
-      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 7);
-      showStep(7);
+      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 8);
+      showStep(8);
       return;
     }
 
@@ -4302,8 +4302,8 @@ document.querySelectorAll('#extraInsulationToggleChoices .choice-card').forEach(
       updateAssignmentPointers();
       updateSummary();
 
-      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 9);
-      showStep(9);
+      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 10);
+      showStep(10);
       return;
     }
 
@@ -4330,8 +4330,8 @@ document.querySelectorAll('#distributionToggleChoices .choice-card').forEach((ca
       updateAssignmentPointers();
       updateSummary();
 
-      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 8);
-      showStep(8);
+      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 9);
+      showStep(9);
       return;
     }
 
