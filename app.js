@@ -3907,11 +3907,11 @@ async function exportPdf() {
 
     pdf.setFontSize(8);
     pdf.text([
-      'PETER JENSEN GmbH',
-      'Borgfelder Straße 19',
-      '20537 Hamburg',
-      'Tel.: 040 / 25793 - 0',
-      'www.peterjensen.de'
+      'NDF Norddeutsche Flächenheizsysteme GmbH',
+      'Raiffeisenstraße 13',
+      '21641 Apensen',
+      'Tel.: +49 4163 / 910 80 91',
+      'www.ndf-gmbh.de'
     ], 155, 28);
 
     pdf.setDrawColor(220);
@@ -4206,7 +4206,7 @@ function getNextRequirementText() {
   }
 
   if (state.currentStep === 3) {
-    return 'Bitte geben Sie eine gültige Postleitzahl ein. Falls diese nicht gefunden wird, tragen Sie die Entfernung zu PETER JENSEN 20537 Hamburg manuell ein.';
+    return 'Bitte geben Sie eine gültige Postleitzahl ein. Falls diese nicht gefunden wird, tragen Sie die Entfernung zu NDF GmbH 21641 Apensen manuell ein.';
   }
 
   if (state.currentStep === 4) {
