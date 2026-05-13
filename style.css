@@ -1316,3 +1316,14 @@ button.disabled-button:hover {
   align-items: center;
   gap: 6px;
 }
+
+.technical-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.technical-grid .info-trigger {
+  flex: 0 0 auto;
+}

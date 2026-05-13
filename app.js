@@ -2922,12 +2922,67 @@ function renderTechnicalRecommendation() {
 
     <h3>Gesamtempfehlung</h3>
     <div class="technical-grid">
-      <div><span>beheizte Fläche</span><strong>${formatQuantity(result.totals.totalArea)} m²</strong></div>
-      <div><span>Rohrlänge</span><strong>${formatQuantity(result.totals.totalPipeLength)} m</strong></div>
-      <div><span>Heizkreise</span><strong>${result.totals.totalCircuits}</strong></div>
-      <div><span>Heizlast</span><strong>ca. ${formatQuantity(result.totals.totalHeatLoad / 1000)} kW</strong></div>
-      <div><span>Volumenstrom</span><strong>ca. ${formatQuantity(result.totals.totalFlowRate)} l/h</strong></div>
-      <div><span>Verteiler</span><strong>${result.totals.distributor}</strong></div>
+     <div><span>beheizte Fläche</span><strong>${formatQuantity(result.totals.totalArea)} m²</strong></div>
+
+<div>
+  <span>Rohrlänge
+    <span class="info-trigger">i
+      <span class="info-tooltip">
+        Berechnung: beheizte Fläche × Rohrmeter je m² je nach Verlegeabstand.
+        Beispiel: 30 m² × 5,8 m/m² bei VA 150 = 174 m Rohr.
+      </span>
+    </span>
+  </span>
+  <strong>${formatQuantity(result.totals.totalPipeLength)} m</strong>
+</div>
+
+<div>
+  <span>Heizkreise
+    <span class="info-trigger">i
+      <span class="info-tooltip">
+        Berechnung: Rohrlänge ÷ maximal empfohlene Heizkreislänge.
+        Das Ergebnis wird auf ganze Heizkreise aufgerundet.
+      </span>
+    </span>
+  </span>
+  <strong>${result.totals.totalCircuits}</strong>
+</div>
+
+<div>
+  <span>Heizlast
+    <span class="info-trigger">i
+      <span class="info-tooltip">
+        Berechnung: beheizte Fläche × Heizlastannahme W/m².
+        Beispiel: 30 m² × 45 W/m² = 1.350 W = 1,35 kW.
+      </span>
+    </span>
+  </span>
+  <strong>ca. ${formatQuantity(result.totals.totalHeatLoad / 1000)} kW</strong>
+</div>
+
+<div>
+  <span>Volumenstrom
+    <span class="info-trigger">i
+      <span class="info-tooltip">
+        Berechnung: Heizlast ÷ (1,163 × Spreizung).
+        Beispiel: 1.350 W ÷ (1,163 × 5 K) = ca. 232 l/h.
+      </span>
+    </span>
+  </span>
+  <strong>ca. ${formatQuantity(result.totals.totalFlowRate)} l/h</strong>
+</div>
+
+<div>
+  <span>Verteiler
+    <span class="info-trigger">i
+      <span class="info-tooltip">
+        Empfehlung: Die Verteilergröße richtet sich nach der berechneten Anzahl der Heizkreise.
+        Beispiel: 7 Heizkreise = 7-fach Verteiler.
+      </span>
+    </span>
+  </span>
+  <strong>${result.totals.distributor}</strong>
+</div>
     </div>
 
     <h3>Raumweise Empfehlung</h3>
