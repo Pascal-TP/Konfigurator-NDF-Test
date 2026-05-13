@@ -1875,20 +1875,23 @@ function parseSpacingMm(spacing) {
 }
 
 function getRoomPipeLength(room) {
-  const area = Number(String(room.area).replace(',', '.')) || 0;
-  const spacingMm = parseSpacingMm(room.spacing);
+  const area = getHeatedAreaForRoom(room);
+  const pipeLengthPerM2 = getPipeLengthPerM2(room.spacing);
 
-  if (area <= 0 || spacingMm <= 0) return 0;
-
-  return (area / spacingMm) * 1000;
+  return area * pipeLengthPerM2;
 }
 
 function getRoomHeatingCircuits(room) {
   const pipeLength = getRoomPipeLength(room);
 
+  const maxCircuitLength =
+    Number(state.recommendation?.maxCircuitLength) ||
+    TECHNICAL_DEFAULTS.maxCircuitLength ||
+    100;
+
   if (pipeLength <= 0) return 0;
 
-  return Math.ceil(pipeLength / 120);
+  return Math.max(1, Math.ceil(pipeLength / maxCircuitLength));
 }
 
 function getRoomThermostatRecommendation(room) {
@@ -1896,7 +1899,7 @@ function getRoomThermostatRecommendation(room) {
 
   if (circuits <= 0) return 0;
 
-  return Math.ceil(circuits / 6);
+  return Math.max(1, Math.ceil(circuits / 6));
 }
 
 function formatAssignmentText(value) {
