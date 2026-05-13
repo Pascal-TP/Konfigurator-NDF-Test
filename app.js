@@ -21,7 +21,8 @@ const state = {
     flowTemperature: null,
     pipeMeterVa100: 8.8,
     pipeMeterVa150: 5.8,
-    pipeMeterVa200: 4.6
+    pipeMeterVa200: 4.6,
+    screedCoverMm: 45
   },
   selectedSystemFloorIndex: 0,
   activeSummaryFloorIndex: 0,
@@ -131,6 +132,7 @@ const technicalCalculationResult = document.getElementById('technicalCalculation
 const recPipeMeterVa100Input = document.getElementById('recPipeMeterVa100');
 const recPipeMeterVa150Input = document.getElementById('recPipeMeterVa150');
 const recPipeMeterVa200Input = document.getElementById('recPipeMeterVa200');
+const recScreedCoverMmInput = document.getElementById('recScreedCoverMm');
 
 const shopToken = new URLSearchParams(window.location.search).get('token');
 const tokenStorageKey = shopToken ? `petershop-konfigurator-token-used-${shopToken}` : '';
@@ -673,6 +675,7 @@ function createRoom() {
     function: 'Wohnraum',
     spacing: 'VA 150',
     area: '',
+    floorCovering: 'Fliesen',
     assignments: {
       system: null,
       thermostat: null,
@@ -1774,11 +1777,13 @@ function renderFloors() {
       const roomSpacingSelect = roomNode.querySelector('.room-spacing');
       const roomAreaInput = roomNode.querySelector('.room-area');
       const removeRoomBtn = roomNode.querySelector('.remove-room-btn');
+      const roomFloorCoveringSelect = roomNode.querySelector('.room-floor-covering');
 
       roomNameInput.value = room.name;
       roomFunctionSelect.value = room.function;
       roomSpacingSelect.value = room.spacing;
       roomAreaInput.value = room.area;
+      roomFloorCoveringSelect.value = room.floorCovering || 'Fliesen';
 
       roomNameInput.addEventListener('input', (e) => {
         state.floors[floorIndex].rooms[roomIndex].name = e.target.value;
@@ -1790,6 +1795,11 @@ function renderFloors() {
       });
       roomSpacingSelect.addEventListener('change', (e) => {
         state.floors[floorIndex].rooms[roomIndex].spacing = e.target.value;
+        updateSummary();
+      });
+      roomFloorCoveringSelect.addEventListener('change', (e) => {
+        state.floors[floorIndex].rooms[roomIndex].floorCovering = e.target.value;
+        renderTechnicalRecommendation();
         updateSummary();
       });
       roomAreaInput.addEventListener('input', (e) => {
@@ -2727,6 +2737,7 @@ function initRecommendationInputs() {
   if (recPipeMeterVa100Input) recPipeMeterVa100Input.value = state.recommendation.pipeMeterVa100;
   if (recPipeMeterVa150Input) recPipeMeterVa150Input.value = state.recommendation.pipeMeterVa150;
   if (recPipeMeterVa200Input) recPipeMeterVa200Input.value = state.recommendation.pipeMeterVa200;
+  if (recScreedCoverMmInput) recScreedCoverMmInput.value = state.recommendation.screedCoverMm;
 }
 
 const TECHNICAL_DEFAULTS = {
@@ -2769,6 +2780,27 @@ function getRecommendedDistributorSize(circuits) {
   return matchingSize ? `${matchingSize}-fach` : `${circuits}-fach oder auf mehrere Verteiler aufteilen`;
 }
 
+function getFloorCoveringFactor(floorCovering) {
+  const map = {
+    'Fliesen': 1.00,
+    'Linoleum': 0.95,
+    'Parkett/Laminat': 0.90,
+    'Teppichboden': 0.80
+  };
+
+  return map[floorCovering] || 1.00;
+}
+
+function getScreedCoverFactor() {
+  const cover = Number(state.recommendation?.screedCoverMm) || 45;
+
+  if (cover <= 45) return 1.00;
+  if (cover <= 50) return 0.98;
+  if (cover <= 55) return 0.96;
+  if (cover <= 60) return 0.94;
+  return 0.92;
+}
+
 function calculateTechnicalRecommendation() {
   const projectDefaults =
     TECHNICAL_DEFAULTS[state.projectType] || TECHNICAL_DEFAULTS.neubau;
@@ -2806,6 +2838,10 @@ function calculateTechnicalRecommendation() {
       const circuits = Math.max(1, Math.ceil(pipeLength / maxCircuitLength));
       const heatLoad = area * heatLoadPerM2;
       const flowRate = heatLoad / (1.163 * deltaT);
+      const floorCovering = room.floorCovering || 'Fliesen';
+      const floorCoveringFactor = getFloorCoveringFactor(floorCovering);
+      const screedCoverFactor = getScreedCoverFactor();
+      const heatEmissionFactor = floorCoveringFactor * screedCoverFactor;
 
       totalArea += area;
       totalPipeLength += pipeLength;
@@ -2821,7 +2857,9 @@ function calculateTechnicalRecommendation() {
         pipeLength,
         circuits,
         heatLoad,
-        flowRate
+        flowRate,
+        floorCovering,
+        heatEmissionFactor
       });
     });
   });
@@ -2880,6 +2918,10 @@ function renderTechnicalRecommendation() {
       <div><span>VA 100</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa100)} m/m²</strong></div>
       <div><span>VA 150</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa150)} m/m²</strong></div>
       <div><span>VA 200</span><strong>ca. ${formatQuantity(state.recommendation.pipeMeterVa200)} m/m²</strong></div>
+      <div class="field">
+        <label for="recScreedCoverMm">geplante Rohrüberdeckung mm</label>
+        <input id="recScreedCoverMm" type="number" min="30" step="1" />
+      </div>
     </div>
 
     <h3>Gesamtempfehlung</h3>
@@ -2905,6 +2947,8 @@ function renderTechnicalRecommendation() {
             <th>HK</th>
             <th>Heizlast</th>
             <th>Volumenstrom</th>
+            <th>Bodenbelag</th>
+            <th>Faktor</th>
           </tr>
         </thead>
         <tbody>
@@ -2918,6 +2962,8 @@ function renderTechnicalRecommendation() {
               <td>${room.circuits}</td>
               <td>ca. ${formatQuantity(room.heatLoad)} W</td>
               <td>ca. ${formatQuantity(room.flowRate)} l/h</td>
+              <td>${room.floorCovering}</td>
+              <td>${formatQuantity(room.heatEmissionFactor)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -4671,7 +4717,8 @@ if (startCalculationBtn) {
   recFlowTemperatureInput,
   recPipeMeterVa100Input,
   recPipeMeterVa150Input,
-  recPipeMeterVa200Input
+  recPipeMeterVa200Input,
+  recScreedCoverMmInput
 ].forEach((input) => {
   if (!input) return;
 
@@ -4696,6 +4743,9 @@ if (startCalculationBtn) {
 
     state.recommendation.pipeMeterVa200 =
       Number(recPipeMeterVa200Input.value) || 4.6;
+
+    state.recommendation.screedCoverMm =
+      Number(recScreedCoverMmInput.value) || 45;
 
     renderTechnicalRecommendation();
     updateSummary();
