@@ -1303,6 +1303,17 @@ button.disabled-button:hover {
   }
 }
 
+.required-note {
+  margin: 0 0 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .field label {
   display: flex;
   align-items: center;
