@@ -4902,7 +4902,7 @@ prevBtn.addEventListener('click', async () => {
   showStep(targetStep);
 });
 
-nextBtn.addEventListener('click', () => {
+nextBtn.addEventListener('click', async () => {
   if (!canProceedToNextStep()) return;
 
   const nextStep = state.currentStep + 1;
