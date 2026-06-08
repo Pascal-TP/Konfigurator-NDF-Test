@@ -63,6 +63,12 @@
               Am Ende erhalten Sie einen oder mehrere passende Artikelvorschläge.
             </p>
           </div>
+          <div class="field" style="margin-top: 16px;">
+  <label for="projectReference">
+    Hier können Sie Ihre Projektnummer / Ihren Projektnamen eingeben:
+  </label>
+  <input id="projectReference" type="text" placeholder="z. B. BV Mustermann / Projekt 2026-001" />
+</div>
         </section>
 
         <section class="step-panel active" data-step-panel="1">
@@ -725,30 +731,33 @@
                       AC</span></label>
                 </div>
 
-                <div class="regulation-list">
-                  <div class="regulation-row">
-                    <label class="check-option regulation-label">
-                      <input type="checkbox" class="regulation-checkbox" data-label="Regelklemmleiste bis zu 6 Zonen" />
-                      <span>Regelklemmleiste bis zu 6 Zonen</span>
-                    </label>
-                    <input type="number" min="0" step="1" class="regulation-qty" placeholder="Menge" />
-                  </div>
+               <div id="regulationOptionsBlock">
+                  <div class="regulation-list">
+                    <div class="regulation-row">
+                      <label class="check-option regulation-label">
+                        <input type="checkbox" class="regulation-checkbox"
+                          data-label="Regelklemmleiste bis zu 6 Zonen" />
+                        <span>Regelklemmleiste bis zu 6 Zonen</span>
+                      </label>
+                      <input type="number" min="0" step="1" class="regulation-qty" placeholder="Menge" />
+                    </div>
 
-                  <div class="regulation-row">
-                    <label class="check-option regulation-label">
-                      <input type="checkbox" class="regulation-checkbox"
-                        data-label="Regelklemmleiste bis zu 10 Zonen" />
-                      <span>Regelklemmleiste bis zu 10 Zonen</span>
-                    </label>
-                    <input type="number" min="0" step="1" class="regulation-qty" placeholder="Menge" />
-                  </div>
+                    <div class="regulation-row">
+                      <label class="check-option regulation-label">
+                        <input type="checkbox" class="regulation-checkbox"
+                          data-label="Regelklemmleiste bis zu 10 Zonen" />
+                        <span>Regelklemmleiste bis zu 10 Zonen</span>
+                      </label>
+                      <input type="number" min="0" step="1" class="regulation-qty" placeholder="Menge" />
+                    </div>
 
-                  <div class="regulation-row">
-                    <label class="check-option regulation-label">
-                      <input type="checkbox" class="regulation-checkbox" data-label="Stellantrieb Premium" />
-                      <span>Stellantrieb Premium</span>
-                    </label>
-                    <input type="number" min="0" step="1" class="regulation-qty" placeholder="Menge" />
+                    <div class="regulation-row">
+                      <label class="check-option regulation-label">
+                        <input type="checkbox" class="regulation-checkbox" data-label="Stellantrieb Premium" />
+                        <span>Stellantrieb Premium</span>
+                      </label>
+                      <input type="number" min="0" step="1" class="regulation-qty" placeholder="Menge" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -999,6 +1008,10 @@
         <button id="clearAllBtn" class="danger clear-all-btn">
           Alle Eingaben löschen
         </button>
+        <div class="summary-box">
+  <strong>Projekt</strong>
+  <span id="summaryProjectReference">Keine Angabe</span>
+</div>
         <div class="summary-box"><strong>Projektart</strong><span id="summaryProjectType">Noch nicht gewählt</span>
         </div>
         <div class="summary-box hidden" id="summaryBrandBox"><strong>Marke</strong><span
