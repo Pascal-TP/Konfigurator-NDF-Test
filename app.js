@@ -1418,7 +1418,7 @@ function renderDistributionToggle() {
     summaryDistributionMode.textContent = 'Keine';
   }
 
-  syncRegulationVoltageRules();
+  syncRegulationRules();
   updateNextButtonAndStepHint();
 }
 
