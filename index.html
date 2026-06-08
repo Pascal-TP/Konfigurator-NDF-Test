@@ -62,13 +62,14 @@
             <p>
               Am Ende erhalten Sie einen oder mehrere passende Artikelvorschläge.
             </p>
+
+            <div class="field" style="margin-top: 16px;">
+              <label for="projectReference">
+                Hier können Sie Ihre Projektnummer / Ihren Projektnamen eingeben:
+              </label>
+              <input id="projectReference" type="text" placeholder="z. B. BV Mustermann / Projekt 2026-001" />
+            </div>
           </div>
-          <div class="field" style="margin-top: 16px;">
-  <label for="projectReference">
-    Hier können Sie Ihre Projektnummer / Ihren Projektnamen eingeben:
-  </label>
-  <input id="projectReference" type="text" placeholder="z. B. BV Mustermann / Projekt 2026-001" />
-</div>
         </section>
 
         <section class="step-panel active" data-step-panel="1">
@@ -82,25 +83,25 @@
           </div>
           <div id="brandBlock" class="sub-block hidden">
             <h3>Marke für Neubau</h3>
-             <div class="choice-row" id="brandChoices">
-            <div class="choice-card brand-card active" data-brand="handelsmarke">
-              <strong>Handelsmarke</strong>
-              <span>Neubau-System mit Handelsmarke.</span>
-              <img src="Logo-Handelsmarke.jpg" alt="Logo Handelsmarke" class="brand-logo">
-            </div>
+            <div class="choice-row" id="brandChoices">
+              <div class="choice-card brand-card active" data-brand="handelsmarke">
+                <strong>Handelsmarke</strong>
+                <span>Neubau-System mit Handelsmarke.</span>
+                <img src="Logo-Handelsmarke.jpg" alt="Logo Handelsmarke" class="brand-logo">
+              </div>
 
-            <div class="choice-card brand-card" data-brand="uponor">
-              <strong>Uponor</strong>
-              <span>Neubau-System mit Uponor-Komponenten.</span>
-              <img src="Logo-Uponor.jpg" alt="Logo Uponor" class="brand-logo">
-            </div>
+              <div class="choice-card brand-card" data-brand="uponor">
+                <strong>Uponor</strong>
+                <span>Neubau-System mit Uponor-Komponenten.</span>
+                <img src="Logo-Uponor.jpg" alt="Logo Uponor" class="brand-logo">
+              </div>
 
-            <div class="choice-card brand-card" data-brand="roth">
-              <strong>Roth</strong>
-              <span>Neubau-System mit Roth-Komponenten.</span>
-              <img src="Logo-Roth.jpg" alt="Logo Roth" class="brand-logo">
+              <div class="choice-card brand-card" data-brand="roth">
+                <strong>Roth</strong>
+                <span>Neubau-System mit Roth-Komponenten.</span>
+                <img src="Logo-Roth.jpg" alt="Logo Roth" class="brand-logo">
+              </div>
             </div>
-          </div>
           </div>
         </section>
 
@@ -731,7 +732,7 @@
                       AC</span></label>
                 </div>
 
-               <div id="regulationOptionsBlock">
+                <div id="regulationOptionsBlock">
                   <div class="regulation-list">
                     <div class="regulation-row">
                       <label class="check-option regulation-label">
@@ -1009,9 +1010,9 @@
           Alle Eingaben löschen
         </button>
         <div class="summary-box">
-  <strong>Projekt</strong>
-  <span id="summaryProjectReference">Keine Angabe</span>
-</div>
+          <strong>Projekt</strong>
+          <span id="summaryProjectReference">Keine Angabe</span>
+        </div>
         <div class="summary-box"><strong>Projektart</strong><span id="summaryProjectType">Noch nicht gewählt</span>
         </div>
         <div class="summary-box hidden" id="summaryBrandBox"><strong>Marke</strong><span
