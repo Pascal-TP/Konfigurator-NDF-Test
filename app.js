@@ -4636,9 +4636,6 @@ document.querySelectorAll('#thermostatToggleChoices .choice-card').forEach((card
       updateAssignmentPointers();
       updateSummary();
 
-      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 8);
-      showStep(8);
-      return;
     }
 
     renderThermostatToggle();
@@ -4664,9 +4661,6 @@ document.querySelectorAll('#extraInsulationToggleChoices .choice-card').forEach(
       updateAssignmentPointers();
       updateSummary();
 
-      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 10);
-      showStep(10);
-      return;
     }
 
     renderExtraInsulationToggle();
@@ -4692,9 +4686,6 @@ document.querySelectorAll('#distributionToggleChoices .choice-card').forEach((ca
       updateAssignmentPointers();
       updateSummary();
 
-      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 9);
-      showStep(9);
-      return;
     }
 
     renderDistributionToggle();
@@ -4915,10 +4906,16 @@ nextBtn.addEventListener('click', () => {
   if (!canProceedToNextStep()) return;
 
   const nextStep = state.currentStep + 1;
-  if (nextStep > state.maxUnlockedStep) {
-    state.maxUnlockedStep = nextStep;
+
+  if (state.currentStep === 5) {
+    await showAppModal({
+      title: 'Hinweis zur Raumzuweisung',
+      message: 'Im nächsten Schritt weisen Sie jedem beheizten Raum ein System zu. Bitte wählen Sie dazu oben rechts zuerst die Etage und den Raum aus. Nach jeder Zuweisung zeigt der Pfeil 👉 an, welcher Raum als nächstes bearbeitet werden sollte.',
+      confirmText: 'OK'
+    });
   }
 
+  state.maxUnlockedStep = Math.max(state.maxUnlockedStep, nextStep);
   showStep(nextStep);
 });
 

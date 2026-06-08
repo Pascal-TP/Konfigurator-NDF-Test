@@ -530,38 +530,36 @@
         </section>
 
         <section class="step-panel" data-step-panel="7">
-          <div class="section-title-row">
-            <h2 class="section-title">6. Thermostat</h2>
+          <h2 class="section-title">6. Thermostat</h2>
 
-            <div class="field floor-select-field">
+          <div class="assignment-head-grid">
+            <div class="sub-block assignment-toggle-card">
+              <h3>Thermostat gewünscht?</h3>
+              <div class="choice-row" id="thermostatToggleChoices">
+                <div class="choice-card" data-thermostat-toggle="ja">
+                  <strong>Ja</strong>
+                </div>
+                <div class="choice-card" data-thermostat-toggle="nein">
+                  <strong>Nein</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="field floor-select-field assignment-selection-block" id="thermostatAssignmentBlock">
               <label for="thermostatFloorSelect">
-                <span id="thermostatPointerFloor" class="assignment-pointer hidden">👉</span>
-                Etage
+                Etage <span id="thermostatPointerFloor" class="assignment-pointer hidden">👉</span>
               </label>
               <select id="thermostatFloorSelect"></select>
 
-              <label for="thermostatRoomSelect" style="margin-top:10px;">
-                <span id="thermostatPointerRoom" class="assignment-pointer hidden">👉</span>
-                Raum
+              <label for="thermostatRoomSelect">
+                Raum <span id="thermostatPointerRoom" class="assignment-pointer hidden">👉</span>
               </label>
               <select id="thermostatRoomSelect"></select>
-            </div>
-          </div>
 
-          <p class="section-subtitle">Bitte wählen, ob und welches Thermostat vorgesehen ist.</p>
-
-          <div class="sub-block">
-            <h3>Thermostat gewünscht?</h3>
-            <div class="choice-row" id="thermostatToggleChoices">
-              <div class="choice-card" data-thermostat-toggle="ja">
-                <strong>Ja</strong>
-              </div>
-              <div class="choice-card" data-thermostat-toggle="nein">
-                <strong>Nein</strong>
-              </div>
+              <button id="assignThermostatNoneBtn" type="button" class="hidden secondary room-none-btn">
+                Für diesen Raum nicht gewünscht
+              </button>
             </div>
-            <button id="assignThermostatNoneBtn" type="button" class="hidden secondary room-none-btn">Nicht für diesen
-              Raum erforderlich</button>
           </div>
 
           <div id="thermostatOptions">
@@ -574,6 +572,7 @@
                   <input type="number" min="1" class="thermostat-qty" data-type="analog">
                 </div>
               </div>
+
               <div class="choice-card" data-thermostat="LCD">
                 <strong>LCD</strong>
                 <span>Digitales Display.</span>
@@ -587,39 +586,36 @@
         </section>
 
         <section class="step-panel" data-step-panel="8">
-          <div class="section-title-row">
-            <h2 class="section-title">7. Verteilertechnik</h2>
+          <h2 class="section-title">7. Verteilertechnik</h2>
 
-            <div class="field floor-select-field">
+          <div class="assignment-head-grid">
+            <div class="sub-block assignment-toggle-card">
+              <h3>Verteiler und Regeltechnik gewünscht?</h3>
+              <div class="choice-row" id="distributionToggleChoices">
+                <div class="choice-card" data-distribution-toggle="ja">
+                  <strong>Ja</strong>
+                </div>
+                <div class="choice-card" data-distribution-toggle="nein">
+                  <strong>Nein</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="field floor-select-field assignment-selection-block" id="distributionAssignmentBlock">
               <label for="distributionFloorSelect">
-                <span id="distributionPointerFloor" class="assignment-pointer hidden">👉</span>
-                Etage
+                Etage <span id="distributionPointerFloor" class="assignment-pointer hidden">👉</span>
               </label>
               <select id="distributionFloorSelect"></select>
 
-              <label for="distributionRoomSelect" style="margin-top:10px;">
-                <span id="distributionPointerRoom" class="assignment-pointer hidden">👉</span>
-                Raum
+              <label for="distributionRoomSelect">
+                Raum <span id="distributionPointerRoom" class="assignment-pointer hidden">👉</span>
               </label>
               <select id="distributionRoomSelect"></select>
-            </div>
-          </div>
-          <p class="section-subtitle">Verteilerschrank-Art, Verteiler-Menge & Typ sowie Regeltechnik.</p>
 
-          <div class="sub-block">
-            <h3>Verteiler und Regeltechnik gewünscht?</h3>
-
-            <div class="choice-row" id="distributionToggleChoices">
-              <div class="choice-card" data-distribution-toggle="ja">
-                <strong>Ja</strong>
-              </div>
-              <div class="choice-card" data-distribution-toggle="nein">
-                <strong>Nein</strong>
-              </div>
+              <button id="assignDistributionNoneBtn" type="button" class="hidden secondary room-none-btn">
+                Für diesen Raum nicht gewünscht
+              </button>
             </div>
-            <button id="assignDistributionNoneBtn" type="button" class="hidden secondary room-none-btn">
-              Nicht für diesen Raum erforderlich
-            </button>
           </div>
 
           <div id="distributionOptions">
@@ -733,6 +729,11 @@
               <div class="sub-block">
                 <h3>Regeltechnik</h3>
 
+                <p class="required-note">
+                  Bitte zuerst die Spannungsart auswählen. Erst danach können Klemmleisten oder Stellantriebe gewählt
+                  werden.
+                </p>
+
                 <div class="radio-list regulation-voltage-list">
                   <label class="radio-option"><input type="checkbox" name="regulationVoltage" value="24V DC" /><span>24V
                       DC</span></label>
@@ -776,28 +777,10 @@
         </section>
 
         <section class="step-panel" data-step-panel="9">
-          <div class="section-title-row">
-            <h2 class="section-title">8. Zusatzdämmung</h2>
+          <h2 class="section-title">8. Zusatzdämmung</h2>
 
-            <div class="field floor-select-field">
-              <label for="extraInsulationFloorSelect">
-                <span id="extraInsulationPointerFloor" class="assignment-pointer hidden">👉</span>
-                Etage
-              </label>
-              <select id="extraInsulationFloorSelect"></select>
-
-              <label for="extraInsulationRoomSelect" style="margin-top:10px;">
-                <span id="extraInsulationPointerRoom" class="assignment-pointer hidden">👉</span>
-                Raum
-              </label>
-              <select id="extraInsulationRoomSelect"></select>
-            </div>
-          </div>
-          <p class="section-subtitle">Geliefert und montiert wird die ausgwählte Zusatzdämmung. Eine
-            Vermibit-Trockenausgelichsschüttung ist inbegriffen.</p>
-
-          <div class="stack-grid">
-            <div class="sub-block">
+          <div class="assignment-head-grid">
+            <div class="sub-block assignment-toggle-card">
               <h3>Zusatzdämmung gewünscht?</h3>
               <div class="choice-row" id="extraInsulationToggleChoices">
                 <div class="choice-card" data-extra-insulation-toggle="ja">
@@ -807,68 +790,79 @@
                   <strong>Nein</strong>
                 </div>
               </div>
-              <button id="assignExtraInsulationNoneBtn" type="button" class="hidden secondary room-none-btn">
-                Nicht für diesen Raum erforderlich
-              </button>
             </div>
 
-            <div id="extraInsulationOptions">
-              <div class="stack-grid">
-                <div class="sub-block">
-                  <h3>Zusatzdämmung</h3>
-                  <div class="radio-list">
-                    <label class="radio-option"><input type="checkbox" name="extraInsulation"
-                        value="PUR" /><span>PUR</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulation"
-                        value="EPS DEO" /><span>EPS
-                        DEO</span></label>
-                  </div>
-                </div>
+            <div class="field floor-select-field assignment-selection-block" id="extraInsulationAssignmentBlock">
+              <label for="extraInsulationFloorSelect">
+                Etage <span id="extraInsulationPointerFloor" class="assignment-pointer hidden">👉</span>
+              </label>
+              <select id="extraInsulationFloorSelect"></select>
 
-                <div class="sub-block">
-                  <h3>Zusatzdämmung-Wärmeleitgruppe</h3>
-                  <div class="radio-list">
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationWlg"
-                        value="035" /><span>035</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationWlg"
-                        value="032" /><span>032</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationWlg"
-                        value="023/024" /><span>023/024</span></label>
-                  </div>
-                </div>
+              <label for="extraInsulationRoomSelect">
+                Raum <span id="extraInsulationPointerRoom" class="assignment-pointer hidden">👉</span>
+              </label>
+              <select id="extraInsulationRoomSelect"></select>
 
-                <div class="sub-block">
-                  <h3>Zusatzdämmung-Dicke</h3>
-                  <div class="radio-list">
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
-                        value="20 mm" /><span>20 mm</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
-                        value="30 mm" /><span>30
-                        mm</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
-                        value="40 mm" /><span>40
-                        mm</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
-                        value="50 mm" /><span>50
-                        mm</span></label>
-                    <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
-                        value="60 mm" /><span>60
-                        mm</span></label>
-                  </div>
+              <button id="assignExtraInsulationNoneBtn" type="button" class="hidden secondary room-none-btn">
+                Für diesen Raum nicht gewünscht
+              </button>
+            </div>
+          </div>
+
+          <div id="extraInsulationOptions">
+            <div class="stack-grid">
+              <div class="sub-block">
+                <h3>Zusatzdämmung</h3>
+                <div class="radio-list">
+                  <label class="radio-option"><input type="checkbox" name="extraInsulation"
+                      value="PUR" /><span>PUR</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulation" value="EPS DEO" /><span>EPS
+                      DEO</span></label>
+                </div>
+              </div>
+
+              <div class="sub-block">
+                <h3>Zusatzdämmung-Wärmeleitgruppe</h3>
+                <div class="radio-list">
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationWlg"
+                      value="035" /><span>035</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationWlg"
+                      value="032" /><span>032</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationWlg"
+                      value="023/024" /><span>023/024</span></label>
+                </div>
+              </div>
+
+              <div class="sub-block">
+                <h3>Zusatzdämmung-Dicke</h3>
+                <div class="radio-list">
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
+                      value="20 mm" /><span>20 mm</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
+                      value="30 mm" /><span>30
+                      mm</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
+                      value="40 mm" /><span>40
+                      mm</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
+                      value="50 mm" /><span>50
+                      mm</span></label>
+                  <label class="radio-option"><input type="checkbox" name="extraInsulationThickness"
+                      value="60 mm" /><span>60
+                      mm</span></label>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="schema-box schema-box-large">
-            <div class="schema-placeholder">
-              <img src="Aufbauschema.png" alt="Aufbau im Schema" class="schema-image">
+            <div class="schema-box schema-box-large">
+              <div class="schema-placeholder">
+                <img src="Aufbauschema.png" alt="Aufbau im Schema" class="schema-image">
+              </div>
+              <div class="layer-item">
+                <span>A: Standard-Estrichhöhe = 60-65mm (Rohrüberdeckung = 45 mm)</span>
+              </div>
+              <div class="layer-list" id="layerList"></div>
             </div>
-            <div class="layer-item">
-              <span>A: Standard-Estrichhöhe = 60-65mm (Rohrüberdeckung = 45 mm)</span>
-            </div>
-            <div class="layer-list" id="layerList"></div>
-          </div>
         </section>
 
         <section class="step-panel" data-step-panel="10">
