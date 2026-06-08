@@ -19,7 +19,7 @@
           <p>Geführte Eingabemaske für die optimale Bedarfsermittlung.</p>
         </div>
         <div class="hero-logo-wrapper">
-          <div class="release-label">Release: 1.0</div>
+          <div class="release-label">Release: 1.1</div>
           <img src="logo.png" alt="Logo" class="hero-logo" />
         </div>
       </div>
@@ -76,13 +76,22 @@
           </div>
           <div id="brandBlock" class="sub-block hidden">
             <h3>Marke für Neubau</h3>
-            <div class="choice-row" id="brandChoices">
-              <div class="choice-card active" data-brand="handelsmarke"><strong>Handelsmarke</strong><span>Vorauswahl
-                  für Neubau.</span></div>
-              <div class="choice-card" data-brand="uponor"><strong>Uponor</strong><span>Neubau-System mit
-                  Uponor-Komponenten.</span></div>
-              <div class="choice-card" data-brand="roth"><strong>Roth</strong><span>Neubau-System mit
-                  Roth-Komponenten.</span></div>
+            <div class="choice-card brand-card active" data-brand="handelsmarke">
+              <strong>Handelsmarke</strong>
+              <span>Neubau-System mit Handelsmarke.</span>
+              <img src="Logo-Handelsmarke.jpg" alt="Logo Handelsmarke" class="brand-logo">
+            </div>
+
+            <div class="choice-card brand-card" data-brand="uponor">
+              <strong>Uponor</strong>
+              <span>Neubau-System mit Uponor-Komponenten.</span>
+              <img src="Logo-Uponor.jpg" alt="Logo Uponor" class="brand-logo">
+            </div>
+
+            <div class="choice-card brand-card" data-brand="roth">
+              <strong>Roth</strong>
+              <span>Neubau-System mit Roth-Komponenten.</span>
+              <img src="Logo-Roth.jpg" alt="Logo Roth" class="brand-logo">
             </div>
           </div>
         </section>
@@ -930,7 +939,7 @@
             <p>
               Hier sehen Sie das ermittelte Ergebnis. Entfernen Sie den jeweiligen Haken,
               wenn Sie eine Position nicht an den NDF übermitteln wollen.
-              
+
             </p>
           </div>
 
@@ -985,6 +994,9 @@
 
       <aside class="summary">
         <h2>Aktuelle Auswahl</h2>
+        <button id="clearAllBtn" class="danger clear-all-btn">
+          Alle Eingaben löschen
+        </button>
         <div class="summary-box"><strong>Projektart</strong><span id="summaryProjectType">Noch nicht gewählt</span>
         </div>
         <div class="summary-box hidden" id="summaryBrandBox"><strong>Marke</strong><span

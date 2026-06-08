@@ -17,7 +17,7 @@ const state = {
   recommendation: {
     heatLoadPerM2: null,
     deltaT: 5,
-    maxCircuitLength: 100,
+    maxCircuitLength: 120,
     flowTemperature: null,
     pipeMeterVa100: 8.8,
     pipeMeterVa150: 5.8,
@@ -117,6 +117,7 @@ const extraInsulationPointerFloor = document.getElementById('extraInsulationPoin
 const extraInsulationPointerRoom = document.getElementById('extraInsulationPointerRoom');
 const manualDistanceBox = document.getElementById('manualDistanceBox');
 const manualDistanceKmInput = document.getElementById('manualDistanceKm');
+const clearAllBtn = document.getElementById('clearAllBtn');
 
 const appModal = document.getElementById('appModal');
 const modalTitle = document.getElementById('modalTitle');
@@ -713,27 +714,97 @@ function resetFromProjectTypeForward() {
   updateSummary();
 }
 
-async function confirmReturnToProjectType(targetStep) {
-  if (targetStep === 1 && state.currentStep > 1) {
-    const confirmed = await showAppModal({
-      title: 'Hinweis',
-      message: 'Die Rückkehr zu diesem Schritt bewirkt ein Zurücksetzen sämtlicher Eingaben.',
-      confirmText: 'Weiter',
-      cancelText: 'Abbrechen'
+function resetFromStep5Forward() {
+  state.thermostat = '';
+  state.thermostatEnabled = '';
+  state.extraInsulationEnabled = '';
+  state.distributionMode = '';
+  state.distributionEnabled = '';
+  state.services = [];
+  state.calculatedProducts = [];
+  state.selectedSystemFloorIndex = 0;
+
+  state.floors.forEach((floor) => {
+    floor.rooms.forEach((room) => {
+      room.assignments = room.assignments || {};
+      room.assignments.system = null;
+      room.assignments.thermostat = null;
+      room.assignments.distribution = null;
+      room.assignments.extraInsulation = null;
     });
+  });
 
-    if (confirmed) {
-      state.projectType = '';
-      state.brand = '';
-      resetFromProjectTypeForward();
-      renderProjectType();
-      updateSummary();
-    }
+  document.querySelectorAll(`
+    input[name="system"],
+    input[name="systemAddon"],
+    input[name="wlg"],
+    input[name="insulationThickness"],
+    input[name="pipeType"],
+    input[name="pipeSize"],
+    input[name="millingSystem"],
+    input[name="estrichRange"],
+    input[name="estrichAdditive"],
+    input[name="dryConstruction"],
+    input[name="cabinetMounting"],
+    input[name="regulationVoltage"],
+    input[name="extraInsulation"],
+    input[name="extraInsulationWlg"],
+    input[name="extraInsulationThickness"],
+    input[name="service"],
+    .regulation-checkbox
+  `).forEach((input) => {
+    input.checked = false;
+    input.disabled = false;
+  });
 
-    return confirmed;
-  }
+  document.querySelectorAll(`
+    .thermostat-qty,
+    .distribution-qty,
+    .regulation-qty
+  `).forEach((input) => {
+    input.value = '';
+    input.disabled = false;
+  });
 
-  return true;
+  document.querySelectorAll('.distribution-type').forEach((select) => {
+    select.selectedIndex = 0;
+    select.disabled = false;
+  });
+
+  document.querySelectorAll(`
+    #thermostatToggleChoices .choice-card,
+    #thermostatChoices .choice-card,
+    #distributionToggleChoices .choice-card,
+    #extraInsulationToggleChoices .choice-card
+  `).forEach((card) => {
+    card.classList.remove('active');
+  });
+
+  renderSystemFloorSelect();
+  renderThermostatToggle();
+  renderDistributionToggle();
+  renderExtraInsulationToggle();
+  renderFloors();
+  updateAssignmentPointers();
+  updateSummary();
+}
+
+async function returnToStep1AndResetFromStep5() {
+  const confirmed = await showAppModal({
+    title: 'Hinweis',
+    message: 'Die Rückkehr zu Schritt 1 setzt alle Eingaben ab Schritt 5 "System" zurück. Projektart, Marke, Wärmeerzeuger, Standort sowie Etagen und Räume bleiben erhalten.',
+    confirmText: 'Weiter',
+    cancelText: 'Abbrechen'
+  });
+
+  if (!confirmed) return;
+
+  resetFromStep5Forward();
+
+  state.currentStep = 1;
+  state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 5);
+
+  showStep(1);
 }
 
 function showStep(step) {
@@ -753,14 +824,8 @@ function showStep(step) {
 
   prevBtn.style.visibility = state.currentStep === 0 ? 'hidden' : 'visible';
   nextBtn.style.display = state.currentStep === totalSteps - 1 ? 'none' : 'inline-flex';
-  nextBtn.disabled = !canProceedToNextStep();
 
-  if (stepHint) {
-    const requirementText = getNextRequirementText();
-
-    stepHint.classList.toggle('hidden', !requirementText);
-    stepHint.textContent = requirementText;
-  }
+  updateNextButtonAndStepHint();
 
   const isRecommendationStep = state.currentStep === 5;
   const isSystemStep = state.currentStep === 6;
@@ -824,6 +889,18 @@ function showStep(step) {
 
   updateAssignmentPointers();
   scrollToTop();
+}
+
+function updateNextButtonAndStepHint() {
+  const canContinue = canProceedToNextStep();
+
+  nextBtn.disabled = !canContinue;
+
+  if (stepHint) {
+    const requirementText = getNextRequirementText();
+    stepHint.classList.toggle('hidden', canContinue || !requirementText);
+    stepHint.textContent = requirementText;
+  }
 }
 
 function canProceedToNextStep() {
@@ -4735,27 +4812,27 @@ if (manualDistanceKmInput) {
 }
 
 document.querySelectorAll('.step-item').forEach((item) => {
-  item.addEventListener('click', () => {
+  item.addEventListener('click', async () => {
     const targetStep = Number(item.dataset.step);
-    if (targetStep <= state.maxUnlockedStep) {
-      if (!confirmReturnToProjectType(targetStep)) return;
 
-      if (targetStep === 1 && state.currentStep > 1) {
-        resetFromProjectTypeForward();
-      }
+    if (targetStep === 0 && state.currentStep >= 3) return;
+    if (targetStep > state.maxUnlockedStep) return;
 
-      showStep(targetStep);
+    if (targetStep === 1 && state.currentStep > 1) {
+      await returnToStep1AndResetFromStep5();
+      return;
     }
+
+    showStep(targetStep);
   });
 });
 
-prevBtn.addEventListener('click', () => {
+prevBtn.addEventListener('click', async () => {
   const targetStep = state.currentStep - 1;
 
-  if (!confirmReturnToProjectType(targetStep)) return;
-
   if (targetStep === 1 && state.currentStep > 1) {
-    resetFromProjectTypeForward();
+    await returnToStep1AndResetFromStep5();
+    return;
   }
 
   showStep(targetStep);
@@ -4874,6 +4951,21 @@ if (assignThermostatNoneBtn) {
 
 if (assignDistributionNoneBtn) {
   assignDistributionNoneBtn.addEventListener('click', assignDistributionNoneToRoom);
+}
+
+if (clearAllBtn) {
+  clearAllBtn.addEventListener('click', async () => {
+    const confirmed = await showAppModal({
+      title: 'Alle Eingaben löschen?',
+      message: 'Möchten Sie wirklich alle Eingaben löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmText: 'Ja, löschen',
+      cancelText: 'Abbrechen'
+    });
+
+    if (!confirmed) return;
+
+    window.location.reload();
+  });
 }
 
 distributionTypeFields.forEach((field) => {
