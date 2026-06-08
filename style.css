@@ -397,6 +397,11 @@ select {
   gap: 10px;
 }
 
+.btn-group.system-buttons {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 button {
   background: var(--primary);
   color: white;

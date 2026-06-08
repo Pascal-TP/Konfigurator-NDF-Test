@@ -637,6 +637,22 @@ function updateAssignFloorSystemButton() {
   }
 
   assignFloorSystemBtn.disabled = !currentSystemSelectionIsComplete();
+
+  if (assignFloorSystemToFloorBtn) {
+    const floor =
+      state.floors[state.selectedSystemFloorIndex];
+
+    const floorAlreadyAssigned =
+      floor?.rooms
+        ?.filter(roomIsHeated)
+        ?.every(room => room.assignments?.system);
+
+    assignFloorSystemToFloorBtn.textContent =
+      floorAlreadyAssigned
+        ? 'System der Etage aktualisieren'
+        : 'System der Etage zuweisen';
+  }
+
   assignFloorSystemBtn.textContent = room.assignments?.system
     ? 'System des Raumes aktualisieren'
     : 'System dem Raum zuweisen';
@@ -944,8 +960,8 @@ function showStep(step) {
   assignFloorSystemToFloorBtn?.classList.toggle('hidden', !isSystemStep);
 
   if (assignFloorSystemToFloorBtn) {
-  assignFloorSystemToFloorBtn.classList.toggle('hidden', !isSystemStep);
-}
+    assignFloorSystemToFloorBtn.classList.toggle('hidden', !isSystemStep);
+  }
 
   if (state.currentStep === 5) {
     return true;
