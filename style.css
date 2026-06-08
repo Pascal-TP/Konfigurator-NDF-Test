@@ -1445,3 +1445,7 @@ button.disabled-button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+#assignFloorSystemToFloorBtn {
+  margin-bottom: 10px;
+}

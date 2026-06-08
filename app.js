@@ -95,6 +95,7 @@ const distributionOptions = document.getElementById('distributionOptions');
 const systemFloorSelect = document.getElementById('systemFloorSelect');
 const systemRoomSelect = document.getElementById('systemRoomSelect');
 const assignFloorSystemBtn = document.getElementById('assignFloorSystemBtn');
+const assignFloorSystemToFloorBtn = document.getElementById('assignFloorSystemToFloorBtn');
 const stepHint = document.getElementById('stepHint');
 const thermostatFloorSelect = document.getElementById('thermostatFloorSelect');
 const thermostatRoomSelect = document.getElementById('thermostatRoomSelect');
@@ -680,6 +681,62 @@ async function assignSystemToSelectedFloor() {
   updateSummary();
 }
 
+async function assignSystemToSelectedEtage() {
+  const floorIndex = Number(systemFloorSelect.value || 0);
+  const floor = state.floors[floorIndex];
+
+  if (!floor) return;
+
+  if (!currentSystemSelectionIsComplete()) {
+    await showAppModal({
+      title: 'Auswahl unvollständig',
+      message: 'Bitte wählen Sie zuerst alle notwendigen Systemangaben aus.',
+      confirmText: 'OK'
+    });
+    return;
+  }
+
+  const heatedRooms = floor.rooms.filter(roomIsHeated);
+
+  if (heatedRooms.length === 0) {
+    await showAppModal({
+      title: 'Hinweis',
+      message: 'Diese Etage enthält keine beheizten Räume und benötigt daher keine Systemzuweisung.',
+      confirmText: 'OK'
+    });
+    return;
+  }
+
+  const confirmed = await showAppModal({
+    title: 'System der Etage zuweisen?',
+    message: `Möchten Sie das aktuell ausgewählte System wirklich allen beheizten Räumen der Etage "${getFloorLabel(floor, floorIndex)}" zuweisen? Bereits vorhandene Systemzuweisungen in dieser Etage werden überschrieben.`,
+    confirmText: 'Ja',
+    cancelText: 'Abbrechen'
+  });
+
+  if (!confirmed) return;
+
+  const selection = getCurrentSystemSelection();
+
+  heatedRooms.forEach((room) => {
+    room.assignments = room.assignments || {};
+    room.assignments.system = structuredClone(selection);
+  });
+
+  const hint = getAllAssignmentsDoneText('system');
+
+  await showAppModal({
+    title: 'Gespeichert',
+    message: `Das System wurde allen beheizten Räumen der Etage "${getFloorLabel(floor, floorIndex)}" zugewiesen.${hint ? '\n\n' + hint : ''}`,
+    confirmText: 'OK'
+  });
+
+  renderSystemFloorSelect();
+  updateAssignmentPointers();
+  scrollAfterAssignment('system');
+  updateSummary();
+}
+
 function showAppModal({ title = 'Hinweis', message = '', confirmText = 'OK', cancelText = null }) {
   return new Promise((resolve) => {
     modalTitle.textContent = title;
@@ -884,6 +941,10 @@ function showStep(step) {
   }
 
   assignFloorSystemBtn.classList.toggle('hidden', !isSystemStep);
+
+  if (assignFloorSystemToFloorBtn) {
+  assignFloorSystemToFloorBtn.classList.toggle('hidden', !isSystemStep);
+}
 
   if (state.currentStep === 5) {
     return true;
@@ -4573,6 +4634,12 @@ systemRoomSelect.addEventListener('change', () => {
 assignFloorSystemBtn.addEventListener('click', () => {
   assignSystemToSelectedFloor();
 });
+
+if (assignFloorSystemToFloorBtn) {
+  assignFloorSystemToFloorBtn.addEventListener('click', () => {
+    assignSystemToSelectedEtage();
+  });
+}
 
 document.querySelectorAll('#projectTypeChoices .choice-card').forEach((card) => {
   card.addEventListener('click', () => {
