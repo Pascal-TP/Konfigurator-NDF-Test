@@ -72,7 +72,7 @@
           </div>
         </section>
 
-        <section class="step-panel active" data-step-panel="1">
+        <section class="step-panel" data-step-panel="1">
           <h2 class="section-title">1. Projektart</h2>
           <p class="section-subtitle">Bitte zuerst die Projektart wählen.</p>
           <div class="choice-row" id="projectTypeChoices">
@@ -151,6 +151,15 @@
               Leider konnte diese Postleitzahl nicht gefunden werden. Bitte geben Sie die Entfernung manuell ein.
             </small>
           </div>
+        </section>
+
+        <section class="step-panel" data-step-panel="4">
+          <h2 class="section-title">4. Räume</h2>
+          <p class="section-subtitle">Etagen und Räume können über das Plus ergänzt werden. Jeder Raum erhält Namen,
+            Funktion, Verlegeabstand und Fläche.</p>
+          <div id="floorsContainer"></div>
+          <div class="btn-group" style="margin-top: 14px;"><button type="button" class="secondary" id="addFloorBtn">+
+              Etage hinzufügen</button></div>
         </section>
 
         <section class="step-panel" data-step-panel="5">
@@ -860,15 +869,6 @@
             </div>
             <div class="layer-list" id="layerList"></div>
           </div>
-        </section>
-
-        <section class="step-panel" data-step-panel="4">
-          <h2 class="section-title">4. Räume</h2>
-          <p class="section-subtitle">Etagen und Räume können über das Plus ergänzt werden. Jeder Raum erhält Namen,
-            Funktion, Verlegeabstand und Fläche.</p>
-          <div id="floorsContainer"></div>
-          <div class="btn-group" style="margin-top: 14px;"><button type="button" class="secondary" id="addFloorBtn">+
-              Etage hinzufügen</button></div>
         </section>
 
         <section class="step-panel" data-step-panel="10">

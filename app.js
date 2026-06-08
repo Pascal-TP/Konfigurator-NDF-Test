@@ -2241,9 +2241,9 @@ function updateSummary() {
 
   let distanceText = '';
 
-if (summaryProjectReference) {
-  summaryProjectReference.textContent = state.projectReference || 'Keine Angabe';
-}
+  if (summaryProjectReference) {
+    summaryProjectReference.textContent = state.projectReference || 'Keine Angabe';
+  }
 
   if (normalizedPlz) {
     summaryPlz.innerHTML = `
@@ -5138,4 +5138,3 @@ syncEstrichAdditivesRules();
 syncEstrichRangeRules();
 updateSummary();
 showStep(0);
-checkTokenUsageOnLoad();
