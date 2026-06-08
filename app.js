@@ -941,6 +941,7 @@ function showStep(step) {
   }
 
   assignFloorSystemBtn.classList.toggle('hidden', !isSystemStep);
+  assignFloorSystemToFloorBtn?.classList.toggle('hidden', !isSystemStep);
 
   if (assignFloorSystemToFloorBtn) {
   assignFloorSystemToFloorBtn.classList.toggle('hidden', !isSystemStep);
