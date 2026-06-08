@@ -303,6 +303,33 @@ function allHeatedRoomsHaveSystemAssignment() {
   });
 }
 
+function allHeatedRoomsHaveThermostatAssignment() {
+  return state.floors.every((floor) => {
+    return floor.rooms.every((room) => {
+      if (!roomIsHeated(room)) return true;
+      return !!room.assignments?.thermostat;
+    });
+  });
+}
+
+function allHeatedRoomsHaveDistributionAssignment() {
+  return state.floors.every((floor) => {
+    return floor.rooms.every((room) => {
+      if (!roomIsHeated(room)) return true;
+      return !!room.assignments?.distribution;
+    });
+  });
+}
+
+function allHeatedRoomsHaveExtraInsulationAssignment() {
+  return state.floors.every((floor) => {
+    return floor.rooms.every((room) => {
+      if (!roomIsHeated(room)) return true;
+      return !!room.assignments?.extraInsulation;
+    });
+  });
+}
+
 function hasAnyThermostatAssignment() {
   return state.floors.some((floor) => {
     return floor.rooms.some((room) => {
@@ -953,7 +980,7 @@ function canProceedToNextStep() {
     }
 
     if (state.thermostatEnabled === 'ja') {
-      return hasAnyThermostatAssignment();
+      return allHeatedRoomsHaveThermostatAssignment();
     }
 
     return false;
@@ -965,7 +992,7 @@ function canProceedToNextStep() {
     }
 
     if (state.distributionEnabled === 'ja') {
-      return hasAnyDistributionAssignment();
+      return allHeatedRoomsHaveDistributionAssignment();
     }
 
     return false;
@@ -977,7 +1004,7 @@ function canProceedToNextStep() {
     }
 
     if (state.extraInsulationEnabled === 'ja') {
-      return hasAnyExtraInsulationAssignment();
+      return allHeatedRoomsHaveExtraInsulationAssignment();
     }
 
     return false;
@@ -4429,20 +4456,20 @@ function getNextRequirementText() {
     return 'Bitte legen Sie mindestens einen Raum mit einer Fläche größer 0 m² an.';
   }
 
-  if (state.currentStep === 5) {
+  if (state.currentStep === 6) {
     return 'Bitte weisen Sie allen beheizten Räumen ein System zu.';
   }
 
-  if (state.currentStep === 6) {
-    return 'Bitte wählen Sie „Nein“ oder weisen Sie mindestens einem beheizten Raum ein Thermostat zu.';
-  }
-
   if (state.currentStep === 7) {
-    return 'Bitte wählen Sie „Nein“ oder weisen Sie mindestens einem beheizten Raum Verteilertechnik zu.';
+    return 'Bitte wählen Sie „Nein“ oder weisen Sie allen beheizten Räumen ein Thermostat zu.';
   }
 
   if (state.currentStep === 8) {
-    return 'Bitte wählen Sie „Nein“ oder weisen Sie mindestens einem beheizten Raum Zusatzdämmung zu.';
+    return 'Bitte wählen Sie „Nein“ oder weisen Sie allen beheizten Räumen Verteilertechnik zu.';
+  }
+
+  if (state.currentStep === 9) {
+    return 'Bitte wählen Sie „Nein“ oder weisen Sie allen beheizten Räumen Zusatzdämmung zu.';
   }
 
   return 'Bitte vervollständigen Sie die Eingaben, bevor Sie fortfahren.';
@@ -4789,25 +4816,13 @@ document.getElementById('plz').addEventListener('input', async (e) => {
 
   updateManualDistanceVisibility();
   updateSummary();
-  nextBtn.disabled = !canProceedToNextStep();
-
-  if (stepHint) {
-    const requirementText = getNextRequirementText();
-    stepHint.classList.toggle('hidden', !requirementText);
-    stepHint.textContent = requirementText;
-  }
+  updateNextButtonAndStepHint();
 });
 
 if (manualDistanceKmInput) {
   manualDistanceKmInput.addEventListener('input', () => {
     updateSummary();
-    nextBtn.disabled = !canProceedToNextStep();
-
-    if (stepHint) {
-      const requirementText = getNextRequirementText();
-      stepHint.classList.toggle('hidden', !requirementText);
-      stepHint.textContent = requirementText;
-    }
+    updateNextButtonAndStepHint();
   });
 }
 
