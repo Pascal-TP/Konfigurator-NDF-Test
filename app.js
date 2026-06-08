@@ -4177,6 +4177,8 @@ async function exportPdf() {
   y += 8;
 
   pdf.setFontSize(9);
+  pdf.text(`Projekt: ${state.projectReference}`, marginLeft, y);
+  y += 5;
   pdf.text(`Projektart: ${projectTypeText}`, marginLeft, y);
   pdf.text(`Marke: ${brandText}`, 105, y);
   y += 5;
@@ -4536,6 +4538,7 @@ function updateFinalCheck() {
   const dryConstructionEntries = getDryConstructionEntries();
 
   finalCheck.innerHTML = `
+    <div><strong>Projekt</strong>${state.projectReference || 'Keine Angabe'}</div>  
     <div><strong>Projekt:</strong> ${summaryProjectType.textContent}${state.projectType === 'neubau' ? ' / ' + summaryBrand.textContent : ''}</div>
     <div><strong>Wärmeerzeuger:</strong> ${summaryHeatSource.textContent}</div>
     <div><strong>PLZ:</strong> ${summaryPlz.textContent}</div>
