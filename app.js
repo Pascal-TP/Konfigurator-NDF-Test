@@ -586,7 +586,7 @@ function updateAssignThermostatButton() {
     : 'Thermostat dem Raum zuweisen';
 
   if (room.assignments?.thermostat?.none) {
-    assignThermostatNoneBtn.textContent = 'Nicht erforderlich (gesetzt)';
+    assignThermostatNoneBtn.textContent = 'Für diesen Raum nicht gewünscht.';
     assignThermostatNoneBtn.classList.add('room-none-active');
   } else {
     assignThermostatNoneBtn.textContent = 'Nicht für diesen Raum erforderlich';
@@ -1608,7 +1608,7 @@ function updateAssignExtraInsulationButton() {
     : 'Zusatzdämmung dem Raum zuweisen';
 
   if (room.assignments?.extraInsulation?.none) {
-    assignExtraInsulationNoneBtn.textContent = 'Nicht erforderlich (gesetzt)';
+    assignExtraInsulationNoneBtn.textContent = 'Für diesen Raum nicht gewünscht.';
     assignExtraInsulationNoneBtn.classList.add('room-none-active');
   } else {
     assignExtraInsulationNoneBtn.textContent = 'Nicht für diesen Raum erforderlich';
@@ -3957,7 +3957,7 @@ function updateAssignDistributionButton() {
     : 'Verteilertechnik dem Raum zuweisen';
 
   if (room.assignments?.distribution?.none) {
-    assignDistributionNoneBtn.textContent = 'Nicht erforderlich (gesetzt)';
+    assignDistributionNoneBtn.textContent = 'Für diesen Raum nicht gewünscht.';
     assignDistributionNoneBtn.classList.add('room-none-active');
   } else {
     assignDistributionNoneBtn.textContent = 'Nicht für diesen Raum erforderlich';
