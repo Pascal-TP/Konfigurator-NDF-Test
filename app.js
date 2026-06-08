@@ -639,6 +639,8 @@ function updateAssignFloorSystemButton() {
   assignFloorSystemBtn.disabled = !currentSystemSelectionIsComplete();
 
   if (assignFloorSystemToFloorBtn) {
+    assignFloorSystemToFloorBtn.disabled = !currentSystemSelectionIsComplete();
+    
     const floor =
       state.floors[state.selectedSystemFloorIndex];
 
