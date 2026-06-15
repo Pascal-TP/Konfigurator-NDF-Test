@@ -1006,12 +1006,12 @@ function showStep(step) {
   if (isDistributionStep) {
     renderDistributionFloorSelect();
     updateAssignDistributionButton();
+    renderFloorCircuitSummary();
   }
 
   if (isExtraInsulationStep) {
     renderExtraInsulationFloorSelect();
     updateAssignExtraInsulationButton();
-    renderFloorCircuitSummary();
   }
 
   updateAssignmentPointers();
