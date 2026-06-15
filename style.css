@@ -1454,3 +1454,23 @@ button.disabled-button:hover {
 #assignFloorSystemToFloorBtn {
   margin-bottom: 10px;
 }
+
+.floor-circuit-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.floor-circuit-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.floor-circuit-row strong {
+  color: #0b2a4a;
+}

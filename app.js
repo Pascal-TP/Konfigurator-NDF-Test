@@ -143,6 +143,7 @@ const recPipeMeterVa100Input = document.getElementById('recPipeMeterVa100');
 const recPipeMeterVa150Input = document.getElementById('recPipeMeterVa150');
 const recPipeMeterVa200Input = document.getElementById('recPipeMeterVa200');
 const recScreedCoverMmInput = document.getElementById('recScreedCoverMm');
+const floorCircuitSummary = document.getElementById('floorCircuitSummary');
 
 const shopToken = new URLSearchParams(window.location.search).get('token');
 // const tokenStorageKey = shopToken ? `petershop-konfigurator-token-used-${shopToken}` : '';
@@ -640,7 +641,7 @@ function updateAssignFloorSystemButton() {
 
   if (assignFloorSystemToFloorBtn) {
     assignFloorSystemToFloorBtn.disabled = !currentSystemSelectionIsComplete();
-    
+
     const floor =
       state.floors[state.selectedSystemFloorIndex];
 
@@ -1010,6 +1011,7 @@ function showStep(step) {
   if (isExtraInsulationStep) {
     renderExtraInsulationFloorSelect();
     updateAssignExtraInsulationButton();
+    renderFloorCircuitSummary();
   }
 
   updateAssignmentPointers();
@@ -3103,6 +3105,34 @@ function calculateTechnicalRecommendation() {
   };
 }
 
+function renderFloorCircuitSummary() {
+  if (!floorCircuitSummary) return;
+
+  const result = calculateTechnicalRecommendation();
+
+  const floorMap = {};
+
+  result.rooms.forEach((room) => {
+    floorMap[room.floor] = (floorMap[room.floor] || 0) + room.circuits;
+  });
+
+  const entries = Object.entries(floorMap);
+
+  if (!entries.length) {
+    floorCircuitSummary.innerHTML = 'Noch keine beheizten Räume mit Heizkreisen vorhanden.';
+    return;
+  }
+
+  floorCircuitSummary.innerHTML = entries
+    .map(([floor, circuits]) => `
+      <div class="floor-circuit-row">
+        <span>${floor}</span>
+        <strong>${circuits} Heizkreis${circuits === 1 ? '' : 'e'}</strong>
+      </div>
+    `)
+    .join('');
+}
+
 function renderTechnicalRecommendation() {
   if (!technicalCalculationResult) return;
 
@@ -4665,7 +4695,10 @@ document.querySelectorAll('#projectTypeChoices .choice-card').forEach((card) => 
     const newProjectType = card.dataset.type;
 
     if (state.projectType && state.projectType !== newProjectType) {
-      resetFromProjectTypeForward();
+      resetFromStep5Forward();
+
+      // Nach Wechsel der Projektart nur ab System neu konfigurieren
+      state.maxUnlockedStep = Math.min(state.maxUnlockedStep, 6);
     }
 
     state.projectType = newProjectType;
