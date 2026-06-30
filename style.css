@@ -171,6 +171,10 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.form-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .form-grid.single,
 .form-grid.single-gap {
   grid-template-columns: 1fr;

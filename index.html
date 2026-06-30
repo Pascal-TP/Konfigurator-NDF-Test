@@ -1079,7 +1079,7 @@
         <h5 class="room-title">Raum 1</h5>
         <button type="button" class="danger remove-room-btn">Raum entfernen</button>
       </div>
-      <div class="form-grid three">
+      <div class="form-grid four">
         <div class="field"><label>Raumbezeichnung</label><input type="text" class="room-name"
             placeholder="z. B. Wohnzimmer" /></div>
         <div class="field"><label>Funktion</label><select class="room-function">
@@ -1103,6 +1103,13 @@
         </div>
         <div class="field"><label>Fläche in m²</label><input type="number" class="room-area" min="0" step="0.1"
             placeholder="z. B. 24" /></div>
+        <div class="field">
+          <label>Estrich gewünscht?</label>
+          <select class="room-estrich">
+            <option value="ja" selected>Ja</option>
+            <option value="nein">Nein</option>
+          </select>
+        </div>
       </div>
     </div>
   </template>

@@ -465,7 +465,7 @@ function renderSystemRoomSelect() {
 
   const room = getSelectedSystemRoom();
   setSystemSelection(room?.assignments?.system || null);
-
+  syncEstrichRangeByArea();
   updateAssignFloorSystemButton();
 }
 
@@ -797,6 +797,7 @@ function createRoom() {
     function: 'Wohnraum',
     spacing: 'VA 150',
     area: '',
+    estrich: 'ja',
     floorCovering: 'Fliesen',
     assignments: {
       system: null,
@@ -1990,6 +1991,7 @@ function renderFloors() {
       const roomFunctionSelect = roomNode.querySelector('.room-function');
       const roomSpacingSelect = roomNode.querySelector('.room-spacing');
       const roomAreaInput = roomNode.querySelector('.room-area');
+      const roomEstrichSelect = roomNode.querySelector('.room-estrich');
       const removeRoomBtn = roomNode.querySelector('.remove-room-btn');
       const roomFloorCoveringSelect = roomNode.querySelector('.room-floor-covering');
 
@@ -1997,6 +1999,7 @@ function renderFloors() {
       roomFunctionSelect.value = room.function;
       roomSpacingSelect.value = room.spacing;
       roomAreaInput.value = room.area;
+      roomEstrichSelect.value = room.estrich || 'ja';
       roomFloorCoveringSelect.value = room.floorCovering || 'Fliesen';
 
       roomNameInput.addEventListener('input', (e) => {
@@ -2018,6 +2021,19 @@ function renderFloors() {
       });
       roomAreaInput.addEventListener('input', (e) => {
         state.floors[floorIndex].rooms[roomIndex].area = e.target.value;
+        updateSummary();
+      });
+
+      roomEstrichSelect.addEventListener('change', (e) => {
+        const currentRoom = state.floors[floorIndex].rooms[roomIndex];
+        currentRoom.estrich = e.target.value;
+
+        if (currentRoom.estrich === 'nein' && currentRoom.assignments?.system) {
+          currentRoom.assignments.system.estrichRange = [];
+          currentRoom.assignments.system.estrichAdditives = [];
+        }
+
+        syncEstrichRangeByArea();
         updateSummary();
       });
 
@@ -2626,8 +2642,19 @@ function getTotalAreaAllRooms() {
   }, 0);
 }
 
+function getTotalEstrichArea() {
+  return state.floors.reduce((sum, floor) => {
+    return sum + floor.rooms.reduce((roomSum, room) => {
+      if (room.estrich !== 'ja') return roomSum;
+
+      const area = Number(String(room.area).replace(',', '.')) || 0;
+      return roomSum + area;
+    }, 0);
+  }, 0);
+}
+
 function getAllowedEstrichRangeByArea() {
-  const area = getTotalAreaAllRooms();
+  const area = getTotalEstrichArea();
 
   if (area >= 10 && area <= 69) return 'Flächen von 10 bis 69 m²';
   if (area >= 70 && area <= 109) return 'Flächen von 70 bis 109 m²';
@@ -2641,11 +2668,18 @@ function getAllowedEstrichRangeByArea() {
 }
 
 function syncEstrichRangeByArea() {
+  const selectedRoom = getSelectedSystemRoom();
+  const estrichAllowedForRoom = !selectedRoom || selectedRoom.estrich === 'ja';
   const allowedRange = getAllowedEstrichRangeByArea();
+  const hasEstrichArea = getTotalEstrichArea() > 0;
+
+  const estrichEnabled = estrichAllowedForRoom && hasEstrichArea && allowedRange;
+
+  estrichBlock.classList.toggle('disabled-block', !estrichEnabled);
 
   estrichRangeCheckboxes.forEach((checkbox) => {
     const label = checkbox.closest('.check-option');
-    const isAllowed = checkbox.value === allowedRange;
+    const isAllowed = estrichEnabled && checkbox.value === allowedRange;
 
     checkbox.disabled = !isAllowed;
 
@@ -2654,6 +2688,18 @@ function syncEstrichRangeByArea() {
     }
 
     label?.classList.toggle('disabled-option', !isAllowed);
+  });
+
+  estrichAdditiveCheckboxes.forEach((checkbox) => {
+    const label = checkbox.closest('.check-option');
+
+    checkbox.disabled = !estrichEnabled;
+
+    if (!estrichEnabled) {
+      checkbox.checked = false;
+    }
+
+    label?.classList.toggle('disabled-option', !estrichEnabled);
   });
 }
 
@@ -3497,26 +3543,40 @@ function calculateProducts() {
     });
   }
   // Estrich Berechnung 58–64
-  getEstrichRangeEntries().forEach((entry) => {
-    const estrichRule = ESTRICH_RANGE_ARTICLES.find(rule => rule.value === entry);
+  const totalEstrichArea = getTotalEstrichArea();
+  const automaticEstrichRange = getAllowedEstrichRangeByArea();
+
+  if (automaticEstrichRange && totalEstrichArea > 0) {
+    const estrichRule = ESTRICH_RANGE_ARTICLES.find(rule => rule.value === automaticEstrichRange);
 
     if (estrichRule) {
       const isFlatRate =
-        entry === 'Flächen von 10 bis 69 m²' ||
-        entry === 'Flächen von 70 bis 109 m²';
+        automaticEstrichRange === 'Flächen von 10 bis 69 m²' ||
+        automaticEstrichRange === 'Flächen von 70 bis 109 m²';
 
-      const quantity = isFlatRate ? 1 : totalAreaAllRooms;
+      const quantity = isFlatRate ? 1 : totalEstrichArea;
 
       addArticle(products, estrichRule.articleNumber, quantity);
     }
-  });
+  }
 
   // Estrich Zusatzmittel Berechnung 65–69
-  getEstrichAdditiveEntries().forEach((entry) => {
+  const selectedEstrichAdditives = new Set();
+
+  state.floors.forEach((floor) => {
+    floor.rooms.forEach((room) => {
+      if (room.estrich !== 'ja') return;
+
+      const additives = room.assignments?.system?.estrichAdditives || [];
+      additives.forEach(entry => selectedEstrichAdditives.add(entry));
+    });
+  });
+
+  selectedEstrichAdditives.forEach((entry) => {
     const additiveRule = ESTRICH_ADDITIVE_ARTICLES.find(rule => rule.value === entry);
 
-    if (additiveRule) {
-      addArticle(products, additiveRule.articleNumber, totalAreaAllRooms);
+    if (additiveRule && totalEstrichArea > 0) {
+      addArticle(products, additiveRule.articleNumber, totalEstrichArea);
     }
   });
 
