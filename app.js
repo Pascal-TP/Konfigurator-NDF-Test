@@ -5030,6 +5030,56 @@ function openFloorplanWindow() {
   bottom: -8px;
   cursor: nwse-resize;
 }
+
+.dimension-cross {
+  position: absolute;
+  inset: 14px;
+  pointer-events: none;
+  opacity: 0.42;
+  z-index: 1;
+}
+
+.dim-line {
+  position: absolute;
+  background: #0b2a4a;
+}
+
+.dim-horizontal {
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  height: 1px;
+}
+
+.dim-vertical {
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 1px;
+}
+
+.dim-text {
+  position: absolute;
+  background: rgba(255,255,255,0.85);
+  color: #0b2a4a;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.dim-width {
+  left: 50%;
+  top: calc(50% - 18px);
+  transform: translateX(-50%);
+}
+
+.dim-height {
+  left: calc(50% + 6px);
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+}
 </style>
 </head>
 <body>
@@ -5087,6 +5137,28 @@ function getRoomSize(room) {
   };
 }
 
+function getRoomDimensions(room) {
+  const area = Math.max(Number(room.area) || 0, 0);
+  const widthPx = Number(room.floorplan?.width) || 1;
+  const heightPx = Number(room.floorplan?.height) || 1;
+
+  if (!area || !widthPx || !heightPx) {
+    return {
+      widthM: '0,00',
+      heightM: '0,00'
+    };
+  }
+
+  const ratio = widthPx / heightPx;
+  const widthM = Math.sqrt(area * ratio);
+  const heightM = area / widthM;
+
+  return {
+    widthM: widthM.toFixed(2).replace('.', ','),
+    heightM: heightM.toFixed(2).replace('.', ',')
+  };
+}
+
 function initRoomPosition(room, roomIndex) {
   room.floorplan = room.floorplan || {};
 
@@ -5141,14 +5213,23 @@ function renderFloor() {
     div.style.width = room.floorplan.width + 'px';
     div.style.height = room.floorplan.height + 'px';
 
-    div.innerHTML =
-      '<div class="room-label">' +
-      '<strong>' + room.name + '</strong>' +
-      'Fläche: ' + room.area + ' m²<br>' +
-      'VA: ' + room.spacing + '<br>' +
-      'HK: ' + room.circuits + '<br>' +
-      'Rohr: ca. ' + Math.round(room.pipeLength) + ' m' +
-      '</div>';
+    const dimensions = getRoomDimensions(room);
+
+div.innerHTML =
+  '<div class="dimension-cross">' +
+    '<div class="dim-line dim-horizontal"></div>' +
+    '<div class="dim-line dim-vertical"></div>' +
+    '<div class="dim-text dim-width">' + dimensions.widthM + ' m</div>' +
+    '<div class="dim-text dim-height">' + dimensions.heightM + ' m</div>' +
+  '</div>' +
+  '<div class="room-label">' +
+  '<strong>' + room.name + '</strong>' +
+  'Fläche: ' + room.area + ' m²<br>' +
+  'Maße: ' + dimensions.widthM + ' × ' + dimensions.heightM + ' m<br>' +
+  'VA: ' + room.spacing + '<br>' +
+  'HK: ' + room.circuits + '<br>' +
+  'Rohr: ca. ' + Math.round(room.pipeLength) + ' m' +
+  '</div>';
 
     if (room.floorplan.doorEnabled) {
   div.appendChild(createDoor(room));
