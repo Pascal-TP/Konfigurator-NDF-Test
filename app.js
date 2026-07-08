@@ -4996,6 +4996,40 @@ function openFloorplanWindow() {
       border-radius: 0;
     }
   }
+
+  .resize-handle {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  background: #0b2a4a;
+  border: 2px solid white;
+  border-radius: 50%;
+  z-index: 5;
+}
+
+.resize-handle.nw {
+  left: -8px;
+  top: -8px;
+  cursor: nwse-resize;
+}
+
+.resize-handle.ne {
+  right: -8px;
+  top: -8px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.sw {
+  left: -8px;
+  bottom: -8px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.se {
+  right: -8px;
+  bottom: -8px;
+  cursor: nwse-resize;
+}
 </style>
 </head>
 <body>
@@ -5037,6 +5071,7 @@ function openFloorplanWindow() {
 const floorData = ${JSON.stringify(floorData)};
 let activeFloorIndex = 0;
 let drag = null;
+let resize = null;
 
 function getRoomSize(room) {
   const area = Math.max(Number(room.area) || 8, 4);
@@ -5116,10 +5151,18 @@ function renderFloor() {
       '</div>';
 
     if (room.floorplan.doorEnabled) {
-      div.appendChild(createDoor(room));
-    }
+  div.appendChild(createDoor(room));
+}
 
-    div.addEventListener('mousedown', startDrag);
+['nw', 'ne', 'sw', 'se'].forEach((pos) => {
+  const handle = document.createElement('div');
+  handle.className = 'resize-handle ' + pos;
+  handle.dataset.resize = pos;
+  handle.addEventListener('mousedown', startResize);
+  div.appendChild(handle);
+});
+
+div.addEventListener('mousedown', startDrag);
 
     workspace.appendChild(div);
   });
@@ -5189,6 +5232,80 @@ function stopDrag() {
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
   drag = null;
+}
+
+function startResize(e) {
+  e.stopPropagation();
+
+  const roomEl = e.currentTarget.closest('.room');
+  const roomIndex = Number(roomEl.dataset.roomIndex);
+  const room = floorData[activeFloorIndex].rooms[roomIndex];
+
+  resize = {
+    room,
+    roomEl,
+    handle: e.currentTarget.dataset.resize,
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: room.floorplan.x,
+    origY: room.floorplan.y,
+    origWidth: room.floorplan.width,
+    origHeight: room.floorplan.height,
+    areaPx: room.floorplan.width * room.floorplan.height
+  };
+
+  document.addEventListener('mousemove', onResize);
+  document.addEventListener('mouseup', stopResize);
+}
+
+function onResize(e) {
+  if (!resize) return;
+
+  const dx = e.clientX - resize.startX;
+  const dy = e.clientY - resize.startY;
+
+  const minWidth = 80;
+  const minHeight = 70;
+  const maxWidth = 650;
+  const maxHeight = 500;
+
+  let newWidth = resize.origWidth;
+  let newX = resize.origX;
+  let newY = resize.origY;
+
+  if (resize.handle.includes('e')) {
+    newWidth = resize.origWidth + dx;
+  }
+
+  if (resize.handle.includes('w')) {
+    newWidth = resize.origWidth - dx;
+    newX = resize.origX + dx;
+  }
+
+  newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+  let newHeight = resize.areaPx / newWidth;
+  newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+
+  if (resize.handle.includes('n')) {
+    newY = resize.origY + (resize.origHeight - newHeight);
+  }
+
+  resize.room.floorplan.x = Math.round(newX / 10) * 10;
+  resize.room.floorplan.y = Math.round(newY / 10) * 10;
+  resize.room.floorplan.width = Math.round(newWidth / 10) * 10;
+  resize.room.floorplan.height = Math.round(newHeight / 10) * 10;
+
+  resize.roomEl.style.left = resize.room.floorplan.x + 'px';
+  resize.roomEl.style.top = resize.room.floorplan.y + 'px';
+  resize.roomEl.style.width = resize.room.floorplan.width + 'px';
+  resize.roomEl.style.height = resize.room.floorplan.height + 'px';
+}
+
+function stopResize() {
+  document.removeEventListener('mousemove', onResize);
+  document.removeEventListener('mouseup', stopResize);
+  resize = null;
 }
 
 function autoArrange() {
