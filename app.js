@@ -5080,6 +5080,89 @@ function openFloorplanWindow() {
   top: 50%;
   transform: translateY(-50%) rotate(-90deg);
 }
+
+.floor-overview {
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.floor-overview h3 {
+  margin: 0 0 10px;
+  color: #0b2a4a;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.overview-value {
+  background: white;
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid #d7d7d7;
+}
+
+.overview-value strong {
+  display: block;
+  font-size: 18px;
+  color: #0b2a4a;
+}
+
+.room-card {
+  border: 1px solid #d7d7d7;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: white;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.room-card:hover {
+  border-color: #0b2a4a;
+  transform: translateY(-1px);
+}
+
+.room-card.active {
+  border-color: #0b2a4a;
+  box-shadow: 0 0 0 3px rgba(11, 42, 74, 0.18);
+  background: #f0f7ff;
+}
+
+.room-card h4 {
+  margin: 0 0 8px;
+  color: #0b2a4a;
+}
+
+.room-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  font-size: 13px;
+}
+
+.room-detail-grid span {
+  color: #6b7280;
+}
+
+.room-detail-grid strong {
+  color: #1f2937;
+}
+
+.room.selected {
+  border-color: #0066cc;
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.25), 0 8px 22px rgba(0,0,0,0.14);
+  z-index: 10;
+}
+
+.room.dimmed {
+  opacity: 0.45;
+}
 </style>
 </head>
 <body>
@@ -5097,29 +5180,15 @@ function openFloorplanWindow() {
   <div class="workspace" id="workspace"></div>
 
   <aside class="sidebar">
-    <h3>Hinweise</h3>
-    <p class="hint">
-      Räume können per Drag & Drop verschoben werden.
-      Die Darstellung ist schematisch und dient zur Orientierung.
-    </p>
-
-    <h3>Legende</h3>
-    <div class="legend-item"><span class="legend-color c1"></span> 1 Heizkreis</div>
-    <div class="legend-item"><span class="legend-color c2"></span> 2 Heizkreise</div>
-    <div class="legend-item"><span class="legend-color c3"></span> 3 oder mehr Heizkreise</div>
-    <div class="legend-item"><span class="legend-color c4"></span> unbeheizter Raum</div>
-
-    <h3>Türen</h3>
-    <p class="hint">
-      Türen werden an der gewählten Raumseite als Öffnung dargestellt.
-      Die Position kommt aus der Eingabe im Konfigurator.
-    </p>
-  </aside>
+  <div id="floorOverview"></div>
+  <div id="roomCards"></div>
+</aside>
 </div>
 
 <script>
 const floorData = ${JSON.stringify(floorData)};
 let activeFloorIndex = 0;
+let selectedRoomIndex = null;
 let drag = null;
 let resize = null;
 const METER_TO_PIXEL = 42;
@@ -5160,15 +5229,9 @@ function updateRoomDimensionText(roomEl, room) {
   if (widthText) widthText.textContent = dimensions.widthM + ' m';
   if (heightText) heightText.textContent = dimensions.heightM + ' m';
 
-  if (label) {
-    label.innerHTML =
-      '<strong>' + room.name + '</strong>' +
-      'Fläche: ' + room.area + ' m²<br>' +
-      'Maße: ' + dimensions.widthM + ' × ' + dimensions.heightM + ' m<br>' +
-      'VA: ' + room.spacing + '<br>' +
-      'HK: ' + room.circuits + '<br>' +
-      'Rohr: ca. ' + Math.round(room.pipeLength) + ' m';
-  }
+if (label) {
+  label.innerHTML = '<strong>' + room.name + '</strong>';
+}
 }
 
 function initRoomPosition(room, roomIndex) {
@@ -5196,6 +5259,91 @@ function renderTabs() {
   }).join('');
 }
 
+function getRoomIcon(room) {
+  const name = String(room.name || '').toLowerCase();
+  const fn = String(room.function || '').toLowerCase();
+
+  if (name.includes('bad') || fn.includes('bad')) return '🚿';
+  if (name.includes('wc')) return '🚽';
+  if (name.includes('küche')) return '🍽';
+  if (name.includes('flur') || name.includes('diele')) return '🚪';
+  if (name.includes('hwr') || name.includes('hauswirtschaft')) return '🧺';
+  if (name.includes('schlaf')) return '🛏';
+  if (name.includes('kind')) return '👶';
+  if (name.includes('büro')) return '💼';
+  if (name.includes('abstell')) return '📦';
+  return '🏠';
+}
+
+function getCircuitText(room) {
+  return room.circuits > 0 ? room.circuits : '–';
+}
+
+function renderSidebar() {
+  const floor = floorData[activeFloorIndex];
+  const floorOverview = document.getElementById('floorOverview');
+  const roomCards = document.getElementById('roomCards');
+
+  const totalArea = floor.rooms.reduce((sum, room) => sum + (Number(room.area) || 0), 0);
+  const totalCircuits = floor.rooms.reduce((sum, room) => sum + (Number(room.circuits) || 0), 0);
+  const totalPipe = floor.rooms.reduce((sum, room) => sum + (Number(room.pipeLength) || 0), 0);
+
+  floorOverview.innerHTML =
+    '<div class="floor-overview">' +
+      '<h3>' + floor.name + '</h3>' +
+      '<div class="overview-grid">' +
+        '<div class="overview-value"><strong>' + floor.rooms.length + '</strong><span>Räume</span></div>' +
+        '<div class="overview-value"><strong>' + totalArea.toFixed(1).replace('.', ',') + ' m²</strong><span>Fläche</span></div>' +
+        '<div class="overview-value"><strong>' + totalCircuits + '</strong><span>Heizkreise</span></div>' +
+        '<div class="overview-value"><strong>' + Math.round(totalPipe) + ' m</strong><span>Rohr</span></div>' +
+      '</div>' +
+    '</div>';
+
+  roomCards.innerHTML = floor.rooms.map((room, index) => {
+    const dimensions = getRoomDimensions(room);
+    const activeClass = selectedRoomIndex === index ? 'active' : '';
+
+    return (
+      '<div class="room-card ' + activeClass + '" data-room-card-index="' + index + '">' +
+        '<h4>' + getRoomIcon(room) + ' ' + room.name + '</h4>' +
+        '<div class="room-detail-grid">' +
+          '<span>Fläche</span><strong>' + room.area + ' m²</strong>' +
+          '<span>Maße</span><strong>' + dimensions.widthM + ' × ' + dimensions.heightM + ' m</strong>' +
+          '<span>Verlegeabstand</span><strong>' + room.spacing + '</strong>' +
+          '<span>Heizkreise</span><strong>' + getCircuitText(room) + '</strong>' +
+          '<span>Rohrlänge</span><strong>ca. ' + Math.round(room.pipeLength) + ' m</strong>' +
+          '<span>Funktion</span><strong>' + room.function + '</strong>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  document.querySelectorAll('.room-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      selectRoom(Number(card.dataset.roomCardIndex));
+    });
+  });
+}
+
+function selectRoom(roomIndex) {
+  selectedRoomIndex = roomIndex;
+
+  document.querySelectorAll('.room').forEach((roomEl) => {
+    const isSelected = Number(roomEl.dataset.roomIndex) === selectedRoomIndex;
+    roomEl.classList.toggle('selected', isSelected);
+    roomEl.classList.toggle('dimmed', selectedRoomIndex !== null && !isSelected);
+  });
+
+  document.querySelectorAll('.room-card').forEach((card) => {
+    card.classList.toggle('active', Number(card.dataset.roomCardIndex) === selectedRoomIndex);
+  });
+
+  const activeCard = document.querySelector('.room-card.active');
+  if (activeCard) {
+    activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
 function renderFloor() {
   renderTabs();
 
@@ -5203,6 +5351,7 @@ function renderFloor() {
   const floor = floorData[activeFloorIndex];
 
   workspace.innerHTML = '';
+  selectedRoomIndex = null;
 
   floor.rooms.forEach((room, roomIndex) => {
     initRoomPosition(room, roomIndex);
@@ -5235,12 +5384,7 @@ div.innerHTML =
     '<div class="dim-text dim-height">' + dimensions.heightM + ' m</div>' +
   '</div>' +
   '<div class="room-label">' +
-  '<strong>' + room.name + '</strong>' +
-  'Fläche: ' + room.area + ' m²<br>' +
-  'Maße: ' + dimensions.widthM + ' × ' + dimensions.heightM + ' m<br>' +
-  'VA: ' + room.spacing + '<br>' +
-  'HK: ' + room.circuits + '<br>' +
-  'Rohr: ca. ' + Math.round(room.pipeLength) + ' m' +
+    '<strong>' + room.name + '</strong>' +
   '</div>';
 
     if (room.floorplan.doorEnabled) {
@@ -5256,9 +5400,15 @@ div.innerHTML =
 });
 
 div.addEventListener('mousedown', startDrag);
+div.addEventListener('click', (e) => {
+  if (e.target.classList.contains('resize-handle')) return;
+  selectRoom(roomIndex);
+});
 
     workspace.appendChild(div);
   });
+
+    renderSidebar();
 }
 
 function createDoor(room) {
@@ -5283,6 +5433,7 @@ function createDoor(room) {
 
 function setFloor(index) {
   activeFloorIndex = index;
+  selectedRoomIndex = null;
   renderFloor();
 }
 
@@ -5396,6 +5547,8 @@ function onResize(e) {
   resize.roomEl.style.height = resize.room.floorplan.height + 'px';
 
   updateRoomDimensionText(resize.roomEl, resize.room);
+  renderSidebar();
+  selectRoom(Number(resize.roomEl.dataset.roomIndex));
 }
 
 function stopResize() {
