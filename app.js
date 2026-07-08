@@ -5122,36 +5122,27 @@ const floorData = ${JSON.stringify(floorData)};
 let activeFloorIndex = 0;
 let drag = null;
 let resize = null;
+const METER_TO_PIXEL = 42;
 
 function getRoomSize(room) {
   const area = Math.max(Number(room.area) || 8, 4);
   const ratio = 1.35;
-  const meterToPixel = 42;
 
   const widthM = Math.sqrt(area * ratio);
   const heightM = area / widthM;
 
   return {
-    width: Math.max(widthM * meterToPixel, 120),
-    height: Math.max(heightM * meterToPixel, 90)
+    width: widthM * METER_TO_PIXEL,
+    height: heightM * METER_TO_PIXEL
   };
 }
 
 function getRoomDimensions(room) {
-  const area = Math.max(Number(room.area) || 0, 0);
   const widthPx = Number(room.floorplan?.width) || 1;
   const heightPx = Number(room.floorplan?.height) || 1;
 
-  if (!area || !widthPx || !heightPx) {
-    return {
-      widthM: '0,00',
-      heightM: '0,00'
-    };
-  }
-
-  const ratio = widthPx / heightPx;
-  const widthM = Math.sqrt(area * ratio);
-  const heightM = area / widthM;
+  const widthM = widthPx / METER_TO_PIXEL;
+  const heightM = heightPx / METER_TO_PIXEL;
 
   return {
     widthM: widthM.toFixed(2).replace('.', ','),
@@ -5364,44 +5355,46 @@ function onResize(e) {
   if (!resize) return;
 
   const dx = e.clientX - resize.startX;
-  const dy = e.clientY - resize.startY;
 
-  const minWidth = 80;
-  const minHeight = 70;
-  const maxWidth = 650;
-  const maxHeight = 500;
+  const minWidthM = 1.2;
+  const maxWidthM = 18;
 
-  let newWidth = resize.origWidth;
+  let newWidthPx = resize.origWidth;
   let newX = resize.origX;
   let newY = resize.origY;
 
   if (resize.handle.includes('e')) {
-    newWidth = resize.origWidth + dx;
+    newWidthPx = resize.origWidth + dx;
   }
 
   if (resize.handle.includes('w')) {
-    newWidth = resize.origWidth - dx;
+    newWidthPx = resize.origWidth - dx;
     newX = resize.origX + dx;
   }
 
-  newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+  let newWidthM = newWidthPx / METER_TO_PIXEL;
+  newWidthM = Math.max(minWidthM, Math.min(maxWidthM, newWidthM));
 
-  let newHeight = resize.areaPx / newWidth;
-  newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+  const areaM2 = Math.max(Number(resize.room.area) || 1, 1);
+  const newHeightM = areaM2 / newWidthM;
+
+  newWidthPx = newWidthM * METER_TO_PIXEL;
+  const newHeightPx = newHeightM * METER_TO_PIXEL;
 
   if (resize.handle.includes('n')) {
-    newY = resize.origY + (resize.origHeight - newHeight);
+    newY = resize.origY + (resize.origHeight - newHeightPx);
   }
 
   resize.room.floorplan.x = Math.round(newX / 10) * 10;
   resize.room.floorplan.y = Math.round(newY / 10) * 10;
-  resize.room.floorplan.width = Math.round(newWidth / 10) * 10;
-  resize.room.floorplan.height = Math.round(newHeight / 10) * 10;
+  resize.room.floorplan.width = Math.round(newWidthPx);
+  resize.room.floorplan.height = Math.round(newHeightPx);
 
   resize.roomEl.style.left = resize.room.floorplan.x + 'px';
   resize.roomEl.style.top = resize.room.floorplan.y + 'px';
   resize.roomEl.style.width = resize.room.floorplan.width + 'px';
   resize.roomEl.style.height = resize.room.floorplan.height + 'px';
+
   updateRoomDimensionText(resize.roomEl, resize.room);
 }
 
