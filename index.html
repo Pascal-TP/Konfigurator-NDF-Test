@@ -248,6 +248,7 @@
             <div id="technicalCalculationResult" class="technical-result-box">
               Die Empfehlung wird automatisch aus den Raumdaten berechnet.
             </div>
+
           </div>
         </section>
 
@@ -935,6 +936,10 @@
             </div>
 
             <div class="btn-group" style="margin-top: 12px;">
+              <button type="button" id="openFloorplanBtn" class="secondary">Grundriss öffnen</button>
+            </div>
+
+            <div class="btn-group" style="margin-top: 12px;">
               <button type="button" id="startCalculationBtn">Berechnung starten</button>
             </div>
           </div>
@@ -1109,6 +1114,33 @@
             <option value="ja" selected>Ja</option>
             <option value="nein">Nein</option>
           </select>
+        </div>
+        <div class="field">
+          <label>Tür im Grundriss?</label>
+          <select class="room-door-enabled">
+            <option value="nein" selected>Nein</option>
+            <option value="ja">Ja</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Türseite</label>
+          <select class="room-door-side">
+            <option value="top">oben</option>
+            <option value="right">rechts</option>
+            <option value="bottom" selected>unten</option>
+            <option value="left">links</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Türposition %</label>
+          <input type="number" class="room-door-position" min="10" max="90" step="5" value="50" />
+        </div>
+
+        <div class="field">
+          <label>Türbreite cm</label>
+          <input type="number" class="room-door-width" min="60" max="140" step="5" value="90" />
         </div>
       </div>
     </div>

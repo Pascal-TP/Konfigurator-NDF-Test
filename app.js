@@ -799,6 +799,18 @@ function createRoom() {
     area: '',
     estrich: 'ja',
     floorCovering: 'Fliesen',
+
+    floorplan: {
+      x: null,
+      y: null,
+      width: null,
+      height: null,
+      doorEnabled: false,
+      doorSide: 'bottom',
+      doorPosition: 50,
+      doorWidth: 90
+    },
+
     assignments: {
       system: null,
       thermostat: null,
@@ -1994,6 +2006,10 @@ function renderFloors() {
       const roomEstrichSelect = roomNode.querySelector('.room-estrich');
       const removeRoomBtn = roomNode.querySelector('.remove-room-btn');
       const roomFloorCoveringSelect = roomNode.querySelector('.room-floor-covering');
+      const roomDoorEnabledSelect = roomNode.querySelector('.room-door-enabled');
+      const roomDoorSideSelect = roomNode.querySelector('.room-door-side');
+      const roomDoorPositionInput = roomNode.querySelector('.room-door-position');
+      const roomDoorWidthInput = roomNode.querySelector('.room-door-width');
 
       roomNameInput.value = room.name;
       roomFunctionSelect.value = room.function;
@@ -2001,6 +2017,21 @@ function renderFloors() {
       roomAreaInput.value = room.area;
       roomEstrichSelect.value = room.estrich || 'ja';
       roomFloorCoveringSelect.value = room.floorCovering || 'Fliesen';
+      room.floorplan = room.floorplan || {
+        x: null,
+        y: null,
+        width: null,
+        height: null,
+        doorEnabled: false,
+        doorSide: 'bottom',
+        doorPosition: 50,
+        doorWidth: 90
+      };
+
+      roomDoorEnabledSelect.value = room.floorplan.doorEnabled ? 'ja' : 'nein';
+      roomDoorSideSelect.value = room.floorplan.doorSide || 'bottom';
+      roomDoorPositionInput.value = room.floorplan.doorPosition || 50;
+      roomDoorWidthInput.value = room.floorplan.doorWidth || 90;
 
       roomNameInput.addEventListener('input', (e) => {
         state.floors[floorIndex].rooms[roomIndex].name = e.target.value;
@@ -2021,6 +2052,26 @@ function renderFloors() {
       });
       roomAreaInput.addEventListener('input', (e) => {
         state.floors[floorIndex].rooms[roomIndex].area = e.target.value;
+        updateSummary();
+      });
+
+      roomDoorEnabledSelect.addEventListener('change', (e) => {
+        state.floors[floorIndex].rooms[roomIndex].floorplan.doorEnabled = e.target.value === 'ja';
+        updateSummary();
+      });
+
+      roomDoorSideSelect.addEventListener('change', (e) => {
+        state.floors[floorIndex].rooms[roomIndex].floorplan.doorSide = e.target.value;
+        updateSummary();
+      });
+
+      roomDoorPositionInput.addEventListener('input', (e) => {
+        state.floors[floorIndex].rooms[roomIndex].floorplan.doorPosition = Number(e.target.value) || 50;
+        updateSummary();
+      });
+
+      roomDoorWidthInput.addEventListener('input', (e) => {
+        state.floors[floorIndex].rooms[roomIndex].floorplan.doorWidth = Number(e.target.value) || 90;
         updateSummary();
       });
 
@@ -4727,6 +4778,438 @@ function updateFinalCheck() {
   `;
 }
 
+function openFloorplanWindow() {
+  const result = calculateTechnicalRecommendation();
+
+  const win = window.open('', 'ndfFloorplan', 'width=1400,height=900,resizable=yes,scrollbars=yes');
+
+  if (!win) {
+    showAppModal({
+      title: 'Pop-up blockiert',
+      message: 'Bitte erlauben Sie Pop-ups für diese Seite, damit der Grundriss geöffnet werden kann.',
+      confirmText: 'OK'
+    });
+    return;
+  }
+
+  const floorData = state.floors.map((floor, floorIndex) => {
+    return {
+      name: getFloorLabel(floor, floorIndex),
+      rooms: floor.rooms.map((room, roomIndex) => {
+        const technicalRoom = result.rooms.find(r =>
+          r.floor === getFloorLabel(floor, floorIndex) &&
+          r.room === getRoomLabel(room, roomIndex)
+        );
+
+        return {
+          name: getRoomLabel(room, roomIndex),
+          function: room.function,
+          area: Number(room.area) || 0,
+          spacing: room.spacing,
+          circuits: technicalRoom?.circuits || 0,
+          pipeLength: technicalRoom?.pipeLength || 0,
+          floorplan: room.floorplan || {}
+        };
+      })
+    };
+  });
+
+  win.document.open();
+  win.document.write(`
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Grundriss - Fußbodenheizung</title>
+<style>
+  body {
+    margin: 0;
+    font-family: "Segoe UI", sans-serif;
+    background: #eef1f4;
+    color: #1f2937;
+  }
+
+  header {
+    background: #0b2a4a;
+    color: white;
+    padding: 16px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #dbe7f1;
+    color: #0b2a4a;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px;
+    background: white;
+    border-bottom: 1px solid #d7d7d7;
+  }
+
+  .tab {
+    border: 1px solid #d7d7d7;
+    background: #f8fafc;
+  }
+
+  .tab.active {
+    background: #0b2a4a;
+    color: white;
+  }
+
+  .workspace-wrap {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .workspace {
+    position: relative;
+    height: calc(100vh - 150px);
+    min-height: 620px;
+    background:
+      linear-gradient(#d9e2ea 1px, transparent 1px),
+      linear-gradient(90deg, #d9e2ea 1px, transparent 1px);
+    background-size: 20px 20px;
+    border: 1px solid #c7d2dd;
+    border-radius: 14px;
+    overflow: auto;
+  }
+
+  .room {
+    position: absolute;
+    border: 4px solid #273647;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 4px;
+    cursor: move;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.14);
+    user-select: none;
+  }
+
+  .room.heated-1 { background: #ecfdf3; }
+  .room.heated-2 { background: #fff7d6; }
+  .room.heated-3 { background: #fde8e8; }
+  .room.unheated { background: #f1f5f9; }
+
+  .room-label {
+    padding: 8px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .room-label strong {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 3px;
+  }
+
+  .door {
+    position: absolute;
+    background: #eef1f4;
+    border: 2px solid #0b2a4a;
+    z-index: 3;
+  }
+
+  .door.top, .door.bottom {
+    height: 8px;
+  }
+
+  .door.left, .door.right {
+    width: 8px;
+  }
+
+  .door.top { top: -6px; border-bottom: none; }
+  .door.bottom { bottom: -6px; border-top: none; }
+  .door.left { left: -6px; border-right: none; }
+  .door.right { right: -6px; border-left: none; }
+
+  .sidebar {
+    background: white;
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid #d7d7d7;
+    height: calc(100vh - 150px);
+    min-height: 620px;
+    overflow: auto;
+  }
+
+  .hint {
+    color: #6b7280;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 14px;
+  }
+
+  .legend-color {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #999;
+    border-radius: 4px;
+  }
+
+  .c1 { background: #ecfdf3; }
+  .c2 { background: #fff7d6; }
+  .c3 { background: #fde8e8; }
+  .c4 { background: #f1f5f9; }
+
+  @media print {
+    header, .tabs, .sidebar {
+      display: none;
+    }
+
+    .workspace-wrap {
+      display: block;
+      padding: 0;
+    }
+
+    .workspace {
+      height: 100vh;
+      border: none;
+      border-radius: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Schematischer Grundriss</h1>
+  <div class="toolbar">
+    <button onclick="autoArrange()">Automatisch anordnen</button>
+    <button onclick="window.print()">Drucken / PDF</button>
+  </div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="workspace-wrap">
+  <div class="workspace" id="workspace"></div>
+
+  <aside class="sidebar">
+    <h3>Hinweise</h3>
+    <p class="hint">
+      Räume können per Drag & Drop verschoben werden.
+      Die Darstellung ist schematisch und dient zur Orientierung.
+    </p>
+
+    <h3>Legende</h3>
+    <div class="legend-item"><span class="legend-color c1"></span> 1 Heizkreis</div>
+    <div class="legend-item"><span class="legend-color c2"></span> 2 Heizkreise</div>
+    <div class="legend-item"><span class="legend-color c3"></span> 3 oder mehr Heizkreise</div>
+    <div class="legend-item"><span class="legend-color c4"></span> unbeheizter Raum</div>
+
+    <h3>Türen</h3>
+    <p class="hint">
+      Türen werden an der gewählten Raumseite als Öffnung dargestellt.
+      Die Position kommt aus der Eingabe im Konfigurator.
+    </p>
+  </aside>
+</div>
+
+<script>
+const floorData = ${JSON.stringify(floorData)};
+let activeFloorIndex = 0;
+let drag = null;
+
+function getRoomSize(room) {
+  const area = Math.max(Number(room.area) || 8, 4);
+  const ratio = 1.35;
+  const meterToPixel = 42;
+
+  const widthM = Math.sqrt(area * ratio);
+  const heightM = area / widthM;
+
+  return {
+    width: Math.max(widthM * meterToPixel, 120),
+    height: Math.max(heightM * meterToPixel, 90)
+  };
+}
+
+function initRoomPosition(room, roomIndex) {
+  room.floorplan = room.floorplan || {};
+
+  const size = getRoomSize(room);
+
+  if (!room.floorplan.width) room.floorplan.width = size.width;
+  if (!room.floorplan.height) room.floorplan.height = size.height;
+
+  if (room.floorplan.x === null || room.floorplan.x === undefined) {
+    room.floorplan.x = 40 + (roomIndex % 4) * 230;
+  }
+
+  if (room.floorplan.y === null || room.floorplan.y === undefined) {
+    room.floorplan.y = 40 + Math.floor(roomIndex / 4) * 190;
+  }
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+
+  tabs.innerHTML = floorData.map((floor, index) => {
+    return '<button class="tab ' + (index === activeFloorIndex ? 'active' : '') + '" onclick="setFloor(' + index + ')">' + floor.name + '</button>';
+  }).join('');
+}
+
+function renderFloor() {
+  renderTabs();
+
+  const workspace = document.getElementById('workspace');
+  const floor = floorData[activeFloorIndex];
+
+  workspace.innerHTML = '';
+
+  floor.rooms.forEach((room, roomIndex) => {
+    initRoomPosition(room, roomIndex);
+
+    const div = document.createElement('div');
+
+    const circuitClass =
+      room.function === 'unbeheizter Raum'
+        ? 'unheated'
+        : room.circuits <= 1
+          ? 'heated-1'
+          : room.circuits === 2
+            ? 'heated-2'
+            : 'heated-3';
+
+    div.className = 'room ' + circuitClass;
+    div.dataset.roomIndex = roomIndex;
+    div.style.left = room.floorplan.x + 'px';
+    div.style.top = room.floorplan.y + 'px';
+    div.style.width = room.floorplan.width + 'px';
+    div.style.height = room.floorplan.height + 'px';
+
+    div.innerHTML =
+      '<div class="room-label">' +
+      '<strong>' + room.name + '</strong>' +
+      'Fläche: ' + room.area + ' m²<br>' +
+      'VA: ' + room.spacing + '<br>' +
+      'HK: ' + room.circuits + '<br>' +
+      'Rohr: ca. ' + Math.round(room.pipeLength) + ' m' +
+      '</div>';
+
+    if (room.floorplan.doorEnabled) {
+      div.appendChild(createDoor(room));
+    }
+
+    div.addEventListener('mousedown', startDrag);
+
+    workspace.appendChild(div);
+  });
+}
+
+function createDoor(room) {
+  const door = document.createElement('div');
+  const side = room.floorplan.doorSide || 'bottom';
+  const pos = Number(room.floorplan.doorPosition) || 50;
+  const doorWidthCm = Number(room.floorplan.doorWidth) || 90;
+  const doorWidthPx = Math.max(doorWidthCm * 0.7, 42);
+
+  door.className = 'door ' + side;
+
+  if (side === 'top' || side === 'bottom') {
+    door.style.width = doorWidthPx + 'px';
+    door.style.left = 'calc(' + pos + '% - ' + (doorWidthPx / 2) + 'px)';
+  } else {
+    door.style.height = doorWidthPx + 'px';
+    door.style.top = 'calc(' + pos + '% - ' + (doorWidthPx / 2) + 'px)';
+  }
+
+  return door;
+}
+
+function setFloor(index) {
+  activeFloorIndex = index;
+  renderFloor();
+}
+
+function startDrag(e) {
+  const roomEl = e.currentTarget;
+  const roomIndex = Number(roomEl.dataset.roomIndex);
+  const room = floorData[activeFloorIndex].rooms[roomIndex];
+
+  drag = {
+    room,
+    roomEl,
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: room.floorplan.x,
+    origY: room.floorplan.y
+  };
+
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', stopDrag);
+}
+
+function onDrag(e) {
+  if (!drag) return;
+
+  const dx = e.clientX - drag.startX;
+  const dy = e.clientY - drag.startY;
+
+  const grid = 10;
+  const newX = Math.max(0, Math.round((drag.origX + dx) / grid) * grid);
+  const newY = Math.max(0, Math.round((drag.origY + dy) / grid) * grid);
+
+  drag.room.floorplan.x = newX;
+  drag.room.floorplan.y = newY;
+
+  drag.roomEl.style.left = newX + 'px';
+  drag.roomEl.style.top = newY + 'px';
+}
+
+function stopDrag() {
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', stopDrag);
+  drag = null;
+}
+
+function autoArrange() {
+  const floor = floorData[activeFloorIndex];
+
+  floor.rooms.forEach((room, index) => {
+    room.floorplan.x = 40 + (index % 4) * 230;
+    room.floorplan.y = 40 + Math.floor(index / 4) * 190;
+  });
+
+  renderFloor();
+}
+
+renderFloor();
+</script>
+</body>
+</html>
+  `);
+  win.document.close();
+}
+
 systemFloorSelect.addEventListener('change', () => {
   state.selectedSystemFloorIndex = Number(systemFloorSelect.value);
   renderSystemRoomSelect();
@@ -4747,6 +5230,15 @@ assignFloorSystemBtn.addEventListener('click', () => {
 if (assignFloorSystemToFloorBtn) {
   assignFloorSystemToFloorBtn.addEventListener('click', () => {
     assignSystemToSelectedEtage();
+  });
+}
+
+const openFloorplanBtn = document.getElementById('openFloorplanBtn');
+
+if (openFloorplanBtn) {
+  openFloorplanBtn.addEventListener('click', () => {
+    renderTechnicalRecommendation();
+    openFloorplanWindow();
   });
 }
 
