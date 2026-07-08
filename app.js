@@ -5159,6 +5159,27 @@ function getRoomDimensions(room) {
   };
 }
 
+function updateRoomDimensionText(roomEl, room) {
+  const dimensions = getRoomDimensions(room);
+
+  const widthText = roomEl.querySelector('.dim-width');
+  const heightText = roomEl.querySelector('.dim-height');
+  const label = roomEl.querySelector('.room-label');
+
+  if (widthText) widthText.textContent = dimensions.widthM + ' m';
+  if (heightText) heightText.textContent = dimensions.heightM + ' m';
+
+  if (label) {
+    label.innerHTML =
+      '<strong>' + room.name + '</strong>' +
+      'Fläche: ' + room.area + ' m²<br>' +
+      'Maße: ' + dimensions.widthM + ' × ' + dimensions.heightM + ' m<br>' +
+      'VA: ' + room.spacing + '<br>' +
+      'HK: ' + room.circuits + '<br>' +
+      'Rohr: ca. ' + Math.round(room.pipeLength) + ' m';
+  }
+}
+
 function initRoomPosition(room, roomIndex) {
   room.floorplan = room.floorplan || {};
 
@@ -5381,6 +5402,7 @@ function onResize(e) {
   resize.roomEl.style.top = resize.room.floorplan.y + 'px';
   resize.roomEl.style.width = resize.room.floorplan.width + 'px';
   resize.roomEl.style.height = resize.room.floorplan.height + 'px';
+  updateRoomDimensionText(resize.roomEl, resize.room);
 }
 
 function stopResize() {
