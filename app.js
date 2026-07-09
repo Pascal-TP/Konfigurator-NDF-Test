@@ -5153,8 +5153,12 @@ function openFloorplanWindow() {
 .draw-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #d7d7d7;
+  flex-wrap: wrap;
 }
 
 .draw-area-hint {
@@ -6020,6 +6024,8 @@ function openDrawRoomDialog(shape) {
       '<h3>Raum aus Grundriss übernehmen</h3>' +
       '<div class="draw-area-hint">Berechnete Fläche: ' + areaText + ' m²</div>' +
 
+      '<div class="draw-grid">' +
+      
       '<div class="draw-field">' +
   '<label>Raumbezeichnung</label>' +
   '<select id="drawRoomName">' +
