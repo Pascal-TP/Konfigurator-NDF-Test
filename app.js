@@ -4814,6 +4814,24 @@ function deleteRoomFromFloorplan(floorIndex, roomIndex) {
   return true;
 }
 
+function addFloorFromFloorplan(floorName) {
+  const newFloor = createFloor();
+
+  newFloor.name = floorName || `Etage ${state.floors.length + 1}`;
+  newFloor.rooms = [];
+
+  state.floors.push(newFloor);
+
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+
+  return {
+    name: newFloor.name,
+    rooms: []
+  };
+}
+
 function deleteAllRoomsFromFloorplan(floorIndex) {
   const floor = state.floors[floorIndex];
   if (!floor) return false;
@@ -5064,6 +5082,25 @@ function openFloorplanWindow() {
   background: rgba(0, 102, 204, 0.12);
   pointer-events: none;
   z-index: 20;
+  overflow: hidden;
+}
+
+.draw-dimension-cross {
+  opacity: 0.65;
+}
+
+.draw-area-live {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  background: rgba(255,255,255,0.92);
+  color: #0b2a4a;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 999px;
+  z-index: 25;
+  pointer-events: none;
 }
 
 .draw-modal-backdrop {
@@ -5319,8 +5356,9 @@ function openFloorplanWindow() {
 <header>
   <h1>Schematischer Grundriss</h1>
   <div class="toolbar">
-  <button id="moveModeBtn" onclick="setMode('move')" class="mode-btn active-mode">Raum verschieben</button>
+<button id="moveModeBtn" onclick="setMode('move')" class="mode-btn active-mode">Raum verschieben</button>
 <button id="drawModeBtn" onclick="setMode('draw')" class="mode-btn">Raum zeichnen</button>
+<button onclick="addFloorFromPlan()">Etage hinzufügen</button>
 <button onclick="deleteAllRooms()">Alle Räume löschen</button>
 <button onclick="window.print()">Drucken / PDF</button>
 </div>
@@ -5517,6 +5555,14 @@ function renderSidebar() {
     '</div>';
 
   roomCards.innerHTML = floor.rooms.map((room, index) => {
+    if (!floor.rooms.length) {
+  roomCards.innerHTML =
+    '<div class="room-card">' +
+      '<h4>Keine Räume vorhanden</h4>' +
+      '<div class="muted">Nutzen Sie „Raum zeichnen“, um Räume auf dieser Etage anzulegen.</div>' +
+    '</div>';
+  return;
+}
     const dimensions = getRoomDimensions(room);
     const activeClass = selectedRoomIndex === index ? 'active' : '';
 
@@ -5654,6 +5700,29 @@ function setFloor(index) {
   renderFloor();
 }
 
+function addFloorFromPlan() {
+  const floorName = prompt('Bezeichnung der neuen Etage:', 'Etage ' + (floorData.length + 1));
+
+  if (!floorName) return;
+
+  const newFloor =
+    window.opener &&
+    typeof window.opener.addFloorFromFloorplan === 'function'
+      ? window.opener.addFloorFromFloorplan(floorName.trim())
+      : null;
+
+  if (!newFloor) {
+    alert('Die Etage konnte nicht im Haupt-Konfigurator angelegt werden.');
+    return;
+  }
+
+  floorData.push(newFloor);
+  activeFloorIndex = floorData.length - 1;
+  selectedRoomIndex = null;
+
+  renderFloor();
+}
+
 function startDrag(e) {
 if (mode !== 'move') return;
   const roomEl = e.currentTarget;
@@ -5786,14 +5855,23 @@ function startDraw(e) {
   const startX = e.clientX - rect.left + workspace.scrollLeft;
   const startY = e.clientY - rect.top + workspace.scrollTop;
 
-  const preview = document.createElement('div');
-  preview.className = 'draw-preview';
-  preview.style.left = startX + 'px';
-  preview.style.top = startY + 'px';
-  preview.style.width = '0px';
-  preview.style.height = '0px';
+const preview = document.createElement('div');
+preview.className = 'draw-preview';
+preview.style.left = startX + 'px';
+preview.style.top = startY + 'px';
+preview.style.width = '0px';
+preview.style.height = '0px';
 
-  workspace.appendChild(preview);
+preview.innerHTML =
+  '<div class="dimension-cross draw-dimension-cross">' +
+    '<div class="dim-line dim-horizontal"></div>' +
+    '<div class="dim-line dim-vertical"></div>' +
+    '<div class="dim-text dim-width">0,00 m</div>' +
+    '<div class="dim-text dim-height">0,00 m</div>' +
+  '</div>' +
+  '<div class="draw-area-live">0,00 m²</div>';
+
+workspace.appendChild(preview);
 
   draw = {
     startX,
@@ -5814,15 +5892,32 @@ function onDraw(e) {
   const currentX = e.clientX - rect.left + workspace.scrollLeft;
   const currentY = e.clientY - rect.top + workspace.scrollTop;
 
-  const x = Math.min(draw.startX, currentX);
-  const y = Math.min(draw.startY, currentY);
-  const width = Math.abs(currentX - draw.startX);
-  const height = Math.abs(currentY - draw.startY);
+  const rawX = Math.min(draw.startX, currentX);
+  const rawY = Math.min(draw.startY, currentY);
+  const rawWidth = Math.abs(currentX - draw.startX);
+  const rawHeight = Math.abs(currentY - draw.startY);
 
-  draw.preview.style.left = Math.round(x / 10) * 10 + 'px';
-  draw.preview.style.top = Math.round(y / 10) * 10 + 'px';
-  draw.preview.style.width = Math.round(width / 10) * 10 + 'px';
-  draw.preview.style.height = Math.round(height / 10) * 10 + 'px';
+  const x = Math.round(rawX / 10) * 10;
+  const y = Math.round(rawY / 10) * 10;
+  const width = Math.round(rawWidth / 10) * 10;
+  const height = Math.round(rawHeight / 10) * 10;
+
+  draw.preview.style.left = x + 'px';
+  draw.preview.style.top = y + 'px';
+  draw.preview.style.width = width + 'px';
+  draw.preview.style.height = height + 'px';
+
+  const widthM = width / METER_TO_PIXEL;
+  const heightM = height / METER_TO_PIXEL;
+  const areaM2 = widthM * heightM;
+
+  const widthText = draw.preview.querySelector('.dim-width');
+  const heightText = draw.preview.querySelector('.dim-height');
+  const areaText = draw.preview.querySelector('.draw-area-live');
+
+  if (widthText) widthText.textContent = widthM.toFixed(2).replace('.', ',') + ' m';
+  if (heightText) heightText.textContent = heightM.toFixed(2).replace('.', ',') + ' m';
+  if (areaText) areaText.textContent = areaM2.toFixed(2).replace('.', ',') + ' m²';
 }
 
 function stopDraw() {
