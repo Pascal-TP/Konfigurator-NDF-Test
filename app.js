@@ -787,7 +787,8 @@ function createFloor() {
   return {
     name: 'Erdgeschoss',
     systemAssignment: null,
-    rooms: [createRoom()]
+    floorplanDistributor: null,
+    rooms: []
   };
 }
 
@@ -2088,18 +2089,16 @@ function renderFloors() {
         updateSummary();
       });
 
-      const canRemoveFloor = state.floors.length > 1;
+      removeRoomBtn.disabled = false;
+removeRoomBtn.classList.remove('disabled-button');
 
-      removeFloorBtn.disabled = !canRemoveFloor;
-      removeFloorBtn.classList.toggle('disabled-button', !canRemoveFloor);
-
-      removeFloorBtn.addEventListener('click', () => {
-        if (state.floors.length <= 1) return;
-
-        state.floors.splice(floorIndex, 1);
-        renderFloors();
-        updateSummary();
-      });
+removeRoomBtn.addEventListener('click', () => {
+  state.floors[floorIndex].rooms.splice(roomIndex, 1);
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+  updateNextButtonAndStepHint();
+});
 
       const canRemoveRoom = state.floors[floorIndex].rooms.length > 1;
 
@@ -4810,6 +4809,7 @@ function deleteRoomFromFloorplan(floorIndex, roomIndex) {
   renderFloors();
   renderTechnicalRecommendation();
   updateSummary();
+  updateNextButtonAndStepHint();
 
   return true;
 }
@@ -4841,6 +4841,7 @@ function deleteAllRoomsFromFloorplan(floorIndex) {
   renderFloors();
   renderTechnicalRecommendation();
   updateSummary();
+  updateNextButtonAndStepHint();
 
   return true;
 }
@@ -6514,6 +6515,8 @@ document.getElementById('workspace').addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
+
+  e.preventDefault();
 
   const activeTag = document.activeElement?.tagName?.toLowerCase();
   if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') return;
