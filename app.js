@@ -5492,6 +5492,7 @@ let resize = null;
 let draw = null;
 let modeCursorLabel = null;
 let distributorGhost = null;
+let distributorDrag = null;
 const METER_TO_PIXEL = 42;
 
 function getRoomSize(room) {
@@ -5877,10 +5878,74 @@ function renderDistributor() {
   marker.style.left = floor.distributor.x + 'px';
   marker.style.top = floor.distributor.y + 'px';
 
+  marker.addEventListener('mousedown', startDistributorDrag);
+
   workspace.appendChild(marker);
 }
 
+function startDistributorDrag(e) {
+  if (mode !== 'move') return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const floor = floorData[activeFloorIndex];
+
+  distributorDrag = {
+    marker: e.currentTarget,
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: floor.distributor.x,
+    origY: floor.distributor.y
+  };
+
+  document.addEventListener('mousemove', onDistributorDrag);
+  document.addEventListener('mouseup', stopDistributorDrag);
+}
+
+function onDistributorDrag(e) {
+  if (!distributorDrag) return;
+
+  const floor = floorData[activeFloorIndex];
+
+  const dx = e.clientX - distributorDrag.startX;
+  const dy = e.clientY - distributorDrag.startY;
+
+  const grid = 10;
+  const newX = Math.max(0, Math.round((distributorDrag.origX + dx) / grid) * grid);
+  const newY = Math.max(0, Math.round((distributorDrag.origY + dy) / grid) * grid);
+
+  floor.distributor.x = newX;
+  floor.distributor.y = newY;
+
+  distributorDrag.marker.style.left = newX + 'px';
+  distributorDrag.marker.style.top = newY + 'px';
+}
+
+function stopDistributorDrag() {
+  if (!distributorDrag) return;
+
+  const floor = floorData[activeFloorIndex];
+
+  const saved =
+    window.opener &&
+    typeof window.opener.updateDistributorFromWindow === 'function'
+      ? window.opener.updateDistributorFromWindow(activeFloorIndex, floor.distributor)
+      : false;
+
+  if (!saved) {
+    alert('Der Verteiler konnte nicht im Haupt-Konfigurator gespeichert werden.');
+  }
+
+  document.removeEventListener('mousemove', onDistributorDrag);
+  document.removeEventListener('mouseup', stopDistributorDrag);
+
+  distributorDrag = null;
+}
+
 function openDoorDialog(roomIndex) {
+  removeModeHelpers();
+
   const room = floorData[activeFloorIndex].rooms[roomIndex];
   const fp = room.floorplan || {};
 
