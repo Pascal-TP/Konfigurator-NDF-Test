@@ -4845,6 +4845,35 @@ function deleteAllRoomsFromFloorplan(floorIndex) {
   return true;
 }
 
+function updateRoomFloorplanFromWindow(floorIndex, roomIndex, floorplanData) {
+  const room = state.floors[floorIndex]?.rooms[roomIndex];
+  if (!room) return false;
+
+  room.floorplan = {
+    ...(room.floorplan || {}),
+    ...floorplanData
+  };
+
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+
+  return true;
+}
+
+function updateDistributorFromWindow(floorIndex, distributorData) {
+  const floor = state.floors[floorIndex];
+  if (!floor) return false;
+
+  floor.floorplanDistributor = distributorData;
+
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+
+  return true;
+}
+
 function openFloorplanWindow() {
   const result = calculateTechnicalRecommendation();
 
@@ -4862,6 +4891,7 @@ function openFloorplanWindow() {
   const floorData = state.floors.map((floor, floorIndex) => {
     return {
       name: getFloorLabel(floor, floorIndex),
+      distributor: floor.floorplanDistributor || null,
       rooms: floor.rooms.map((room, roomIndex) => {
         const technicalRoom = result.rooms.find(r =>
           r.floor === getFloorLabel(floor, floorIndex) &&
@@ -5354,6 +5384,45 @@ function openFloorplanWindow() {
 .room.dimmed {
   opacity: 0.45;
 }
+
+.workspace.door-mode {
+  cursor: cell;
+}
+
+.workspace.distributor-mode {
+  cursor: crosshair;
+}
+
+.distributor-marker {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #0b2a4a;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  z-index: 30;
+  cursor: move;
+}
+
+.distributor-marker::after {
+  content: "Verteiler";
+  position: absolute;
+  left: 48px;
+  top: 9px;
+  background: white;
+  color: #0b2a4a;
+  border: 1px solid #d7d7d7;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
@@ -5362,6 +5431,8 @@ function openFloorplanWindow() {
   <div class="toolbar">
 <button id="moveModeBtn" onclick="setMode('move')" class="mode-btn active-mode">Raum verschieben</button>
 <button id="drawModeBtn" onclick="setMode('draw')" class="mode-btn">Raum zeichnen</button>
+<button id="doorModeBtn" onclick="setMode('door')" class="mode-btn">Tür setzen</button>
+<button id="distributorModeBtn" onclick="setMode('distributor')" class="mode-btn">Verteiler setzen</button>
 <button onclick="addFloorFromPlan()">Etage hinzufügen</button>
 <button onclick="deleteAllRooms()">Alle Räume löschen</button>
 <button onclick="window.print()">Drucken / PDF</button>
@@ -5462,6 +5533,12 @@ function setMode(newMode) {
   document.getElementById('drawModeBtn')?.classList.toggle('active-mode', mode === 'draw');
 
   document.getElementById('workspace')?.classList.toggle('draw-mode', mode === 'draw');
+
+  document.getElementById('doorModeBtn')?.classList.toggle('active-mode', mode === 'door');
+document.getElementById('distributorModeBtn')?.classList.toggle('active-mode', mode === 'distributor');
+
+document.getElementById('workspace')?.classList.toggle('door-mode', mode === 'door');
+document.getElementById('workspace')?.classList.toggle('distributor-mode', mode === 'distributor');
 }
 
 function deleteSelectedRoom() {
@@ -5670,12 +5747,20 @@ div.innerHTML =
 div.addEventListener('mousedown', startDrag);
 div.addEventListener('click', (e) => {
   if (e.target.classList.contains('resize-handle')) return;
+
+  if (mode === 'door') {
+    e.stopPropagation();
+    openDoorDialog(roomIndex);
+    return;
+  }
+
   selectRoom(roomIndex);
 });
 
     workspace.appendChild(div);
   });
 
+    renderDistributor();
     renderSidebar();
 }
 
@@ -5697,6 +5782,100 @@ function createDoor(room) {
   }
 
   return door;
+}
+
+function renderDistributor() {
+  const workspace = document.getElementById('workspace');
+  const floor = floorData[activeFloorIndex];
+
+  if (!floor.distributor) return;
+
+  const marker = document.createElement('div');
+  marker.className = 'distributor-marker';
+  marker.textContent = 'V';
+  marker.style.left = floor.distributor.x + 'px';
+  marker.style.top = floor.distributor.y + 'px';
+
+  workspace.appendChild(marker);
+}
+
+function openDoorDialog(roomIndex) {
+  const room = floorData[activeFloorIndex].rooms[roomIndex];
+  const fp = room.floorplan || {};
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'draw-modal-backdrop';
+
+  backdrop.innerHTML =
+    '<div class="draw-modal">' +
+      '<h3>Tür setzen</h3>' +
+      '<div class="draw-grid">' +
+        '<div class="draw-field">' +
+          '<label>Tür vorhanden?</label>' +
+          '<select id="doorEnabled">' +
+            '<option value="ja">Ja</option>' +
+            '<option value="nein">Nein</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="draw-field">' +
+          '<label>Türseite</label>' +
+          '<select id="doorSide">' +
+            '<option value="top">oben</option>' +
+            '<option value="right">rechts</option>' +
+            '<option value="bottom">unten</option>' +
+            '<option value="left">links</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="draw-field">' +
+          '<label>Position %</label>' +
+          '<input id="doorPosition" type="number" min="5" max="95" step="5" value="' + (fp.doorPosition || 50) + '">' +
+        '</div>' +
+        '<div class="draw-field">' +
+          '<label>Türbreite cm</label>' +
+          '<input id="doorWidth" type="number" min="60" max="140" step="5" value="' + (fp.doorWidth || 90) + '">' +
+        '</div>' +
+      '</div>' +
+      '<div class="draw-modal-actions">' +
+        '<button type="button" id="cancelDoorDialog">Abbrechen</button>' +
+        '<button type="button" id="saveDoorDialog">Tür übernehmen</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(backdrop);
+
+  document.getElementById('doorEnabled').value = fp.doorEnabled ? 'ja' : 'nein';
+  document.getElementById('doorSide').value = fp.doorSide || 'bottom';
+
+  document.getElementById('cancelDoorDialog').addEventListener('click', () => {
+    backdrop.remove();
+  });
+
+  document.getElementById('saveDoorDialog').addEventListener('click', () => {
+    const newFloorplan = {
+      ...room.floorplan,
+      doorEnabled: document.getElementById('doorEnabled').value === 'ja',
+      doorSide: document.getElementById('doorSide').value,
+      doorPosition: Number(document.getElementById('doorPosition').value) || 50,
+      doorWidth: Number(document.getElementById('doorWidth').value) || 90
+    };
+
+    const saved =
+      window.opener &&
+      typeof window.opener.updateRoomFloorplanFromWindow === 'function'
+        ? window.opener.updateRoomFloorplanFromWindow(activeFloorIndex, roomIndex, newFloorplan)
+        : false;
+
+    if (!saved) {
+      alert('Die Tür konnte nicht im Haupt-Konfigurator gespeichert werden.');
+      return;
+    }
+
+    room.floorplan = newFloorplan;
+
+    backdrop.remove();
+    renderFloor();
+    selectRoom(roomIndex);
+  });
 }
 
 function setFloor(index) {
@@ -6158,6 +6337,35 @@ renderFloor();
 setMode('move');
 
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
+document.getElementById('workspace').addEventListener('click', (e) => {
+  if (mode !== 'distributor') return;
+  if (e.target !== document.getElementById('workspace')) return;
+
+  const workspace = document.getElementById('workspace');
+  const rect = workspace.getBoundingClientRect();
+
+  const x = Math.round((e.clientX - rect.left + workspace.scrollLeft) / 10) * 10;
+  const y = Math.round((e.clientY - rect.top + workspace.scrollTop) / 10) * 10;
+
+  const distributor = { x, y };
+
+  const saved =
+    window.opener &&
+    typeof window.opener.updateDistributorFromWindow === 'function'
+      ? window.opener.updateDistributorFromWindow(activeFloorIndex, distributor)
+      : false;
+
+  if (!saved) {
+    alert('Der Verteiler konnte nicht im Haupt-Konfigurator gespeichert werden.');
+    return;
+  }
+
+  floorData[activeFloorIndex].distributor = distributor;
+
+  setMode('move');
+  renderFloor();
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
 
