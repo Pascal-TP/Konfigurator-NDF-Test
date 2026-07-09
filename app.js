@@ -4801,6 +4801,32 @@ function addRoomFromFloorplan(floorIndex, roomData) {
   return true;
 }
 
+function deleteRoomFromFloorplan(floorIndex, roomIndex) {
+  const floor = state.floors[floorIndex];
+  if (!floor || !floor.rooms[roomIndex]) return false;
+
+  floor.rooms.splice(roomIndex, 1);
+
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+
+  return true;
+}
+
+function deleteAllRoomsFromFloorplan(floorIndex) {
+  const floor = state.floors[floorIndex];
+  if (!floor) return false;
+
+  floor.rooms = [];
+
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+
+  return true;
+}
+
 function openFloorplanWindow() {
   const result = calculateTechnicalRecommendation();
 
@@ -5003,9 +5029,29 @@ function openFloorplanWindow() {
   .c3 { background: #fde8e8; }
   .c4 { background: #f1f5f9; }
 
-button.active-mode {
-  background: #0b2a4a;
-  color: white;
+.mode-btn {
+  background: #dbe7f1;
+  color: #0b2a4a;
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.mode-btn.active-mode {
+  background: #ffffff;
+  color: #0b2a4a;
+  border-color: #ffffff;
+  box-shadow: inset 0 -4px 0 #4ade80, 0 0 0 2px rgba(255,255,255,0.35);
+}
+
+.mode-btn.active-mode::after {
+  content: "aktiv";
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #166534;
+  background: #dcfce7;
+  padding: 2px 6px;
+  border-radius: 999px;
 }
 
 .workspace.draw-mode {
@@ -5273,10 +5319,10 @@ button.active-mode {
 <header>
   <h1>Schematischer Grundriss</h1>
   <div class="toolbar">
-  <button id="moveModeBtn" onclick="setMode('move')" class="active-mode">Raum verschieben</button>
-  <button id="drawModeBtn" onclick="setMode('draw')">Raum zeichnen</button>
-  <button onclick="autoArrange()">Automatisch anordnen</button>
-  <button onclick="window.print()">Drucken / PDF</button>
+  <button id="moveModeBtn" onclick="setMode('move')" class="mode-btn active-mode">Raum verschieben</button>
+<button id="drawModeBtn" onclick="setMode('draw')" class="mode-btn">Raum zeichnen</button>
+<button onclick="deleteAllRooms()">Alle Räume löschen</button>
+<button onclick="window.print()">Drucken / PDF</button>
 </div>
 </header>
 
@@ -5374,6 +5420,60 @@ function setMode(newMode) {
   document.getElementById('drawModeBtn')?.classList.toggle('active-mode', mode === 'draw');
 
   document.getElementById('workspace')?.classList.toggle('draw-mode', mode === 'draw');
+}
+
+function deleteSelectedRoom() {
+  if (selectedRoomIndex === null) return;
+
+  const floor = floorData[activeFloorIndex];
+  const room = floor.rooms[selectedRoomIndex];
+
+  const ok = confirm('Möchten Sie den Raum "' + room.name + '" wirklich löschen?');
+  if (!ok) return;
+
+  const deletedInMainWindow =
+    window.opener &&
+    typeof window.opener.deleteRoomFromFloorplan === 'function'
+      ? window.opener.deleteRoomFromFloorplan(activeFloorIndex, selectedRoomIndex)
+      : false;
+
+  if (!deletedInMainWindow) {
+    alert('Der Raum konnte nicht im Haupt-Konfigurator gelöscht werden.');
+    return;
+  }
+
+  floor.rooms.splice(selectedRoomIndex, 1);
+  selectedRoomIndex = null;
+
+  renderFloor();
+}
+
+function deleteAllRooms() {
+  const floor = floorData[activeFloorIndex];
+
+  if (!floor.rooms.length) {
+    alert('In dieser Etage sind keine Räume vorhanden.');
+    return;
+  }
+
+  const ok = confirm('Möchten Sie wirklich alle Räume der Etage "' + floor.name + '" löschen?');
+  if (!ok) return;
+
+  const deletedInMainWindow =
+    window.opener &&
+    typeof window.opener.deleteAllRoomsFromFloorplan === 'function'
+      ? window.opener.deleteAllRoomsFromFloorplan(activeFloorIndex)
+      : false;
+
+  if (!deletedInMainWindow) {
+    alert('Die Räume konnten nicht im Haupt-Konfigurator gelöscht werden.');
+    return;
+  }
+
+  floor.rooms = [];
+  selectedRoomIndex = null;
+
+  renderFloor();
 }
 
 function getRoomIcon(room) {
@@ -5906,6 +6006,14 @@ renderFloor();
 setMode('move');
 
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
+
+  const activeTag = document.activeElement?.tagName?.toLowerCase();
+  if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') return;
+
+  deleteSelectedRoom();
+});
 </script>
 </body>
 </html>
