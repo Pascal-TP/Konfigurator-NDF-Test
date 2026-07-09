@@ -5554,8 +5554,7 @@ function renderSidebar() {
       '</div>' +
     '</div>';
 
-  roomCards.innerHTML = floor.rooms.map((room, index) => {
-    if (!floor.rooms.length) {
+if (!floor.rooms.length) {
   roomCards.innerHTML =
     '<div class="room-card">' +
       '<h4>Keine Räume vorhanden</h4>' +
@@ -5563,6 +5562,8 @@ function renderSidebar() {
     '</div>';
   return;
 }
+
+roomCards.innerHTML = floor.rooms.map((room, index) => {
     const dimensions = getRoomDimensions(room);
     const activeClass = selectedRoomIndex === index ? 'active' : '';
 
@@ -5701,26 +5702,65 @@ function setFloor(index) {
 }
 
 function addFloorFromPlan() {
-  const floorName = prompt('Bezeichnung der neuen Etage:', 'Etage ' + (floorData.length + 1));
+  const backdrop = document.createElement('div');
+  backdrop.className = 'draw-modal-backdrop';
 
-  if (!floorName) return;
+  backdrop.innerHTML =
+    '<div class="draw-modal">' +
+      '<h3>Etage hinzufügen</h3>' +
 
-  const newFloor =
-    window.opener &&
-    typeof window.opener.addFloorFromFloorplan === 'function'
-      ? window.opener.addFloorFromFloorplan(floorName.trim())
-      : null;
+      '<div class="draw-field">' +
+        '<label>Bezeichnung der Etage</label>' +
+        '<select id="drawFloorName">' +
+          '<option value="">Bitte wählen</option>' +
+          '<option value="Kellergeschoss">Kellergeschoss</option>' +
+          '<option value="Erdgeschoss">Erdgeschoss</option>' +
+          '<option value="Obergeschoss 1">Obergeschoss 1</option>' +
+          '<option value="Obergeschoss 2">Obergeschoss 2</option>' +
+          '<option value="Obergeschoss 3">Obergeschoss 3</option>' +
+          '<option value="Obergeschoss 4">Obergeschoss 4</option>' +
+          '<option value="Dachgeschoss">Dachgeschoss</option>' +
+        '</select>' +
+      '</div>' +
 
-  if (!newFloor) {
-    alert('Die Etage konnte nicht im Haupt-Konfigurator angelegt werden.');
-    return;
-  }
+      '<div class="draw-modal-actions">' +
+        '<button type="button" id="cancelDrawFloor">Abbrechen</button>' +
+        '<button type="button" id="saveDrawFloor">Etage übernehmen</button>' +
+      '</div>' +
+    '</div>';
 
-  floorData.push(newFloor);
-  activeFloorIndex = floorData.length - 1;
-  selectedRoomIndex = null;
+  document.body.appendChild(backdrop);
 
-  renderFloor();
+  document.getElementById('cancelDrawFloor').addEventListener('click', () => {
+    backdrop.remove();
+  });
+
+  document.getElementById('saveDrawFloor').addEventListener('click', () => {
+    const floorName = document.getElementById('drawFloorName').value;
+
+    if (!floorName) {
+      alert('Bitte eine Etage auswählen.');
+      return;
+    }
+
+    const newFloor =
+      window.opener &&
+      typeof window.opener.addFloorFromFloorplan === 'function'
+        ? window.opener.addFloorFromFloorplan(floorName)
+        : null;
+
+    if (!newFloor) {
+      alert('Die Etage konnte nicht im Haupt-Konfigurator angelegt werden.');
+      return;
+    }
+
+    floorData.push(newFloor);
+    activeFloorIndex = floorData.length - 1;
+    selectedRoomIndex = null;
+
+    backdrop.remove();
+    renderFloor();
+  });
 }
 
 function startDrag(e) {
@@ -5980,11 +6020,22 @@ function openDrawRoomDialog(shape) {
       '<h3>Raum aus Grundriss übernehmen</h3>' +
       '<div class="draw-area-hint">Berechnete Fläche: ' + areaText + ' m²</div>' +
 
-      '<div class="draw-grid">' +
-        '<div class="draw-field">' +
-          '<label>Raumname</label>' +
-          '<input id="drawRoomName" type="text" placeholder="z. B. Wohnzimmer">' +
-        '</div>' +
+      '<div class="draw-field">' +
+  '<label>Raumbezeichnung</label>' +
+  '<select id="drawRoomName">' +
+    '<option value="">Bitte wählen</option>' +
+    '<option value="Wohnzimmer">Wohnzimmer</option>' +
+    '<option value="Küche">Küche</option>' +
+    '<option value="Bad">Bad</option>' +
+    '<option value="G-WC">G-WC</option>' +
+    '<option value="Flur">Flur</option>' +
+    '<option value="HWR">HWR</option>' +
+    '<option value="Schlafzimmer">Schlafzimmer</option>' +
+    '<option value="Kinderzimmer">Kinderzimmer</option>' +
+    '<option value="Büro">Büro</option>' +
+    '<option value="Abstellraum">Abstellraum</option>' +
+  '</select>' +
+'</div>' +
 
         '<div class="draw-field">' +
           '<label>Funktion</label>' +
@@ -6040,7 +6091,7 @@ function openDrawRoomDialog(shape) {
     const name = document.getElementById('drawRoomName').value.trim();
 
     if (!name) {
-      alert('Bitte einen Raumnamen eingeben.');
+      alert('Bitte eine Raumbezeichnung auswählen.');
       return;
     }
 
