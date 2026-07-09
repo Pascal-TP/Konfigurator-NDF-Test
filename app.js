@@ -5423,6 +5423,38 @@ function openFloorplanWindow() {
   font-size: 12px;
   white-space: nowrap;
 }
+
+.mode-cursor-label {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  background: #0b2a4a;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  transform: translate(14px, 14px);
+}
+
+.distributor-ghost {
+  position: fixed;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #0b2a4a;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  pointer-events: none;
+  z-index: 2001;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  transform: translate(-21px, -21px);
+}
 </style>
 </head>
 <body>
@@ -5458,6 +5490,8 @@ let mode = 'move';
 let drag = null;
 let resize = null;
 let draw = null;
+let modeCursorLabel = null;
+let distributorGhost = null;
 const METER_TO_PIXEL = 42;
 
 function getRoomSize(room) {
@@ -5531,14 +5565,61 @@ function setMode(newMode) {
 
   document.getElementById('moveModeBtn')?.classList.toggle('active-mode', mode === 'move');
   document.getElementById('drawModeBtn')?.classList.toggle('active-mode', mode === 'draw');
+  document.getElementById('doorModeBtn')?.classList.toggle('active-mode', mode === 'door');
+  document.getElementById('distributorModeBtn')?.classList.toggle('active-mode', mode === 'distributor');
 
   document.getElementById('workspace')?.classList.toggle('draw-mode', mode === 'draw');
+  document.getElementById('workspace')?.classList.toggle('door-mode', mode === 'door');
+  document.getElementById('workspace')?.classList.toggle('distributor-mode', mode === 'distributor');
 
-  document.getElementById('doorModeBtn')?.classList.toggle('active-mode', mode === 'door');
-document.getElementById('distributorModeBtn')?.classList.toggle('active-mode', mode === 'distributor');
+  removeModeHelpers();
 
-document.getElementById('workspace')?.classList.toggle('door-mode', mode === 'door');
-document.getElementById('workspace')?.classList.toggle('distributor-mode', mode === 'distributor');
+  if (mode === 'door') {
+    createModeCursorLabel('Tür in diesen Raum setzen');
+  }
+
+  if (mode === 'distributor') {
+    createModeCursorLabel('Verteiler absetzen');
+    createDistributorGhost();
+  }
+}
+
+function createModeCursorLabel(text) {
+  modeCursorLabel = document.createElement('div');
+  modeCursorLabel.className = 'mode-cursor-label';
+  modeCursorLabel.textContent = text;
+  document.body.appendChild(modeCursorLabel);
+}
+
+function createDistributorGhost() {
+  distributorGhost = document.createElement('div');
+  distributorGhost.className = 'distributor-ghost';
+  distributorGhost.textContent = 'V';
+  document.body.appendChild(distributorGhost);
+}
+
+function removeModeHelpers() {
+  if (modeCursorLabel) {
+    modeCursorLabel.remove();
+    modeCursorLabel = null;
+  }
+
+  if (distributorGhost) {
+    distributorGhost.remove();
+    distributorGhost = null;
+  }
+}
+
+function moveModeHelpers(e) {
+  if (modeCursorLabel) {
+    modeCursorLabel.style.left = e.clientX + 'px';
+    modeCursorLabel.style.top = e.clientY + 'px';
+  }
+
+  if (distributorGhost) {
+    distributorGhost.style.left = e.clientX + 'px';
+    distributorGhost.style.top = e.clientY + 'px';
+  }
 }
 
 function deleteSelectedRoom() {
@@ -5873,6 +5954,7 @@ function openDoorDialog(roomIndex) {
     room.floorplan = newFloorplan;
 
     backdrop.remove();
+    setMode('move');
     renderFloor();
     selectRoom(roomIndex);
   });
@@ -6339,13 +6421,12 @@ setMode('move');
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
 document.getElementById('workspace').addEventListener('click', (e) => {
   if (mode !== 'distributor') return;
-  if (e.target !== document.getElementById('workspace')) return;
 
   const workspace = document.getElementById('workspace');
   const rect = workspace.getBoundingClientRect();
 
-  const x = Math.round((e.clientX - rect.left + workspace.scrollLeft) / 10) * 10;
-  const y = Math.round((e.clientY - rect.top + workspace.scrollTop) / 10) * 10;
+  const x = Math.round((e.clientX - rect.left + workspace.scrollLeft - 21) / 10) * 10;
+  const y = Math.round((e.clientY - rect.top + workspace.scrollTop - 21) / 10) * 10;
 
   const distributor = { x, y };
 
@@ -6374,6 +6455,8 @@ document.addEventListener('keydown', (e) => {
 
   deleteSelectedRoom();
 });
+
+document.addEventListener('mousemove', moveModeHelpers);
 </script>
 </body>
 </html>
