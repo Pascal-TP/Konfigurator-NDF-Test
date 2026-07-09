@@ -4778,6 +4778,29 @@ function updateFinalCheck() {
   `;
 }
 
+function addRoomFromFloorplan(floorIndex, roomData) {
+  const floor = state.floors[floorIndex];
+  if (!floor) return false;
+
+  const newRoom = createRoom();
+
+  newRoom.name = roomData.name || '';
+  newRoom.function = roomData.function || 'Wohnraum';
+  newRoom.spacing = roomData.spacing || 'VA 150';
+  newRoom.area = roomData.area || '';
+  newRoom.estrich = roomData.estrich || 'ja';
+  newRoom.floorCovering = roomData.floorCovering || 'Fliesen';
+  newRoom.floorplan = roomData.floorplan || newRoom.floorplan;
+
+  floor.rooms.push(newRoom);
+
+  renderFloors();
+  renderTechnicalRecommendation();
+  updateSummary();
+
+  return true;
+}
+
 function openFloorplanWindow() {
   const result = calculateTechnicalRecommendation();
 
@@ -4980,6 +5003,87 @@ function openFloorplanWindow() {
   .c3 { background: #fde8e8; }
   .c4 { background: #f1f5f9; }
 
+button.active-mode {
+  background: #0b2a4a;
+  color: white;
+}
+
+.workspace.draw-mode {
+  cursor: crosshair;
+}
+
+.draw-preview {
+  position: absolute;
+  border: 3px dashed #0066cc;
+  background: rgba(0, 102, 204, 0.12);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.draw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.draw-modal {
+  width: min(520px, calc(100vw - 32px));
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.draw-modal h3 {
+  margin: 0 0 14px;
+  color: #0b2a4a;
+}
+
+.draw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.draw-field {
+  display: grid;
+  gap: 5px;
+}
+
+.draw-field label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.draw-field input,
+.draw-field select {
+  padding: 10px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.draw-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.draw-area-hint {
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 10px;
+  margin: 12px 0;
+  font-weight: 700;
+  color: #0b2a4a;
+}
+
   @media print {
     header, .tabs, .sidebar {
       display: none;
@@ -5169,9 +5273,11 @@ function openFloorplanWindow() {
 <header>
   <h1>Schematischer Grundriss</h1>
   <div class="toolbar">
-    <button onclick="autoArrange()">Automatisch anordnen</button>
-    <button onclick="window.print()">Drucken / PDF</button>
-  </div>
+  <button id="moveModeBtn" onclick="setMode('move')" class="active-mode">Raum verschieben</button>
+  <button id="drawModeBtn" onclick="setMode('draw')">Raum zeichnen</button>
+  <button onclick="autoArrange()">Automatisch anordnen</button>
+  <button onclick="window.print()">Drucken / PDF</button>
+</div>
 </header>
 
 <div class="tabs" id="tabs"></div>
@@ -5189,8 +5295,10 @@ function openFloorplanWindow() {
 const floorData = ${JSON.stringify(floorData)};
 let activeFloorIndex = 0;
 let selectedRoomIndex = null;
+let mode = 'move';
 let drag = null;
 let resize = null;
+let draw = null;
 const METER_TO_PIXEL = 42;
 
 function getRoomSize(room) {
@@ -5257,6 +5365,15 @@ function renderTabs() {
   tabs.innerHTML = floorData.map((floor, index) => {
     return '<button class="tab ' + (index === activeFloorIndex ? 'active' : '') + '" onclick="setFloor(' + index + ')">' + floor.name + '</button>';
   }).join('');
+}
+
+function setMode(newMode) {
+  mode = newMode;
+
+  document.getElementById('moveModeBtn')?.classList.toggle('active-mode', mode === 'move');
+  document.getElementById('drawModeBtn')?.classList.toggle('active-mode', mode === 'draw');
+
+  document.getElementById('workspace')?.classList.toggle('draw-mode', mode === 'draw');
 }
 
 function getRoomIcon(room) {
@@ -5438,6 +5555,7 @@ function setFloor(index) {
 }
 
 function startDrag(e) {
+if (mode !== 'move') return;
   const roomEl = e.currentTarget;
   const roomIndex = Number(roomEl.dataset.roomIndex);
   const room = floorData[activeFloorIndex].rooms[roomIndex];
@@ -5479,6 +5597,7 @@ function stopDrag() {
 }
 
 function startResize(e) {
+if (mode !== 'move') return;
   e.stopPropagation();
 
   const roomEl = e.currentTarget.closest('.room');
@@ -5557,6 +5676,221 @@ function stopResize() {
   resize = null;
 }
 
+function startDraw(e) {
+  if (mode !== 'draw') return;
+  if (e.target !== document.getElementById('workspace')) return;
+
+  const workspace = document.getElementById('workspace');
+  const rect = workspace.getBoundingClientRect();
+
+  const startX = e.clientX - rect.left + workspace.scrollLeft;
+  const startY = e.clientY - rect.top + workspace.scrollTop;
+
+  const preview = document.createElement('div');
+  preview.className = 'draw-preview';
+  preview.style.left = startX + 'px';
+  preview.style.top = startY + 'px';
+  preview.style.width = '0px';
+  preview.style.height = '0px';
+
+  workspace.appendChild(preview);
+
+  draw = {
+    startX,
+    startY,
+    preview
+  };
+
+  document.addEventListener('mousemove', onDraw);
+  document.addEventListener('mouseup', stopDraw);
+}
+
+function onDraw(e) {
+  if (!draw) return;
+
+  const workspace = document.getElementById('workspace');
+  const rect = workspace.getBoundingClientRect();
+
+  const currentX = e.clientX - rect.left + workspace.scrollLeft;
+  const currentY = e.clientY - rect.top + workspace.scrollTop;
+
+  const x = Math.min(draw.startX, currentX);
+  const y = Math.min(draw.startY, currentY);
+  const width = Math.abs(currentX - draw.startX);
+  const height = Math.abs(currentY - draw.startY);
+
+  draw.preview.style.left = Math.round(x / 10) * 10 + 'px';
+  draw.preview.style.top = Math.round(y / 10) * 10 + 'px';
+  draw.preview.style.width = Math.round(width / 10) * 10 + 'px';
+  draw.preview.style.height = Math.round(height / 10) * 10 + 'px';
+}
+
+function stopDraw() {
+  if (!draw) return;
+
+  document.removeEventListener('mousemove', onDraw);
+  document.removeEventListener('mouseup', stopDraw);
+
+  const x = Number(parseFloat(draw.preview.style.left)) || 0;
+  const y = Number(parseFloat(draw.preview.style.top)) || 0;
+  const width = Number(parseFloat(draw.preview.style.width)) || 0;
+  const height = Number(parseFloat(draw.preview.style.height)) || 0;
+
+  draw.preview.remove();
+  draw = null;
+
+  if (width < 60 || height < 60) return;
+
+  openDrawRoomDialog({ x, y, width, height });
+}
+
+function calculateDrawnArea(widthPx, heightPx) {
+  const widthM = widthPx / METER_TO_PIXEL;
+  const heightM = heightPx / METER_TO_PIXEL;
+  return widthM * heightM;
+}
+
+function getPipeMeterFactor(spacing) {
+  if (spacing === 'VA 100') return 8.8;
+  if (spacing === 'VA 200') return 4.6;
+  return 5.8;
+}
+
+function calculateDrawnTechnicalValues(room) {
+  const heated = room.function === 'Wohnraum' || room.function === 'Bad';
+
+  if (!heated) {
+    room.circuits = 0;
+    room.pipeLength = 0;
+    return;
+  }
+
+  const area = Number(room.area) || 0;
+  const pipeLength = area * getPipeMeterFactor(room.spacing);
+  const maxCircuitLength = 120;
+
+  room.pipeLength = pipeLength;
+  room.circuits = Math.max(1, Math.ceil(pipeLength / maxCircuitLength));
+}
+
+function openDrawRoomDialog(shape) {
+  const area = calculateDrawnArea(shape.width, shape.height);
+  const areaText = area.toFixed(2).replace('.', ',');
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'draw-modal-backdrop';
+
+  backdrop.innerHTML =
+    '<div class="draw-modal">' +
+      '<h3>Raum aus Grundriss übernehmen</h3>' +
+      '<div class="draw-area-hint">Berechnete Fläche: ' + areaText + ' m²</div>' +
+
+      '<div class="draw-grid">' +
+        '<div class="draw-field">' +
+          '<label>Raumname</label>' +
+          '<input id="drawRoomName" type="text" placeholder="z. B. Wohnzimmer">' +
+        '</div>' +
+
+        '<div class="draw-field">' +
+          '<label>Funktion</label>' +
+          '<select id="drawRoomFunction">' +
+            '<option value="Wohnraum">Wohnraum</option>' +
+            '<option value="Bad">Bad</option>' +
+            '<option value="unbeheizter Raum">unbeheizt</option>' +
+          '</select>' +
+        '</div>' +
+
+        '<div class="draw-field">' +
+          '<label>Verlegeabstand</label>' +
+          '<select id="drawRoomSpacing">' +
+            '<option value="VA 100">VA 100</option>' +
+            '<option value="VA 150" selected>VA 150</option>' +
+            '<option value="VA 200">VA 200</option>' +
+          '</select>' +
+        '</div>' +
+
+        '<div class="draw-field">' +
+          '<label>Estrich gewünscht?</label>' +
+          '<select id="drawRoomEstrich">' +
+            '<option value="ja" selected>Ja</option>' +
+            '<option value="nein">Nein</option>' +
+          '</select>' +
+        '</div>' +
+
+        '<div class="draw-field">' +
+          '<label>Bodenbelag</label>' +
+          '<select id="drawRoomFloorCovering">' +
+            '<option value="Fliesen">Fliesen</option>' +
+            '<option value="Parkett / Laminat">Parkett / Laminat</option>' +
+            '<option value="Vinyl">Vinyl</option>' +
+            '<option value="Teppich">Teppich</option>' +
+            '<option value="Sonstiges">Sonstiges</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="draw-modal-actions">' +
+        '<button type="button" id="cancelDrawRoom">Abbrechen</button>' +
+        '<button type="button" id="saveDrawRoom">Raum übernehmen</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(backdrop);
+
+  document.getElementById('cancelDrawRoom').addEventListener('click', () => {
+    backdrop.remove();
+  });
+
+  document.getElementById('saveDrawRoom').addEventListener('click', () => {
+    const name = document.getElementById('drawRoomName').value.trim();
+
+    if (!name) {
+      alert('Bitte einen Raumnamen eingeben.');
+      return;
+    }
+
+    const room = {
+      name,
+      function: document.getElementById('drawRoomFunction').value,
+      spacing: document.getElementById('drawRoomSpacing').value,
+      area: area.toFixed(2),
+      estrich: document.getElementById('drawRoomEstrich').value,
+      floorCovering: document.getElementById('drawRoomFloorCovering').value,
+      floorplan: {
+        x: shape.x,
+        y: shape.y,
+        width: shape.width,
+        height: shape.height,
+        doorEnabled: false,
+        doorSide: 'bottom',
+        doorPosition: 50,
+        doorWidth: 90
+      }
+    };
+
+    calculateDrawnTechnicalValues(room);
+
+    const savedInMainWindow =
+      window.opener &&
+      typeof window.opener.addRoomFromFloorplan === 'function'
+        ? window.opener.addRoomFromFloorplan(activeFloorIndex, room)
+        : false;
+
+    if (!savedInMainWindow) {
+      alert('Der Raum konnte nicht in den Haupt-Konfigurator übernommen werden.');
+      backdrop.remove();
+      return;
+    }
+
+    floorData[activeFloorIndex].rooms.push(room);
+
+    backdrop.remove();
+    setMode('move');
+    renderFloor();
+    selectRoom(floorData[activeFloorIndex].rooms.length - 1);
+  });
+}
+
 function autoArrange() {
   const floor = floorData[activeFloorIndex];
 
@@ -5569,6 +5903,9 @@ function autoArrange() {
 }
 
 renderFloor();
+setMode('move');
+
+document.getElementById('workspace').addEventListener('mousedown', startDraw);
 </script>
 </body>
 </html>
