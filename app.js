@@ -6308,48 +6308,7 @@ function openDoorDialog(roomIndex) {
     '</div>';
 
   document.body.appendChild(backdrop);
-
-  const drawRoomFunction =
-  document.getElementById('drawRoomFunction');
-
-const drawUnheatedWarning =
-  document.getElementById('drawUnheatedWarning');
-
-function updateDrawUnheatedWarning() {
-  const showWarning =
-    drawRoomFunction.value === 'unbeheizter Raum' &&
-    area >= 6;
-
-  drawUnheatedWarning.classList.toggle(
-    'hidden',
-    !showWarning
-  );
-}
-
-drawRoomFunction.addEventListener(
-  'change',
-  updateDrawUnheatedWarning
-);
-
-updateDrawUnheatedWarning();
-
-const drawRoomTemperature =
-  document.getElementById('drawRoomTemperature');
-
-const drawRoomSpacing =
-  document.getElementById('drawRoomSpacing');
-
-drawRoomFunction.addEventListener('change', () => {
-  if (drawRoomFunction.value === 'Bad') {
-    drawRoomTemperature.value = 24;
-    drawRoomSpacing.value = 'VA 100';
-  } else if (drawRoomFunction.value === 'Wohnraum') {
-    drawRoomTemperature.value = 20;
-  }
-
-  updateDrawUnheatedWarning();
-});
-
+ 
   document.getElementById('doorEnabled').value = fp.doorEnabled ? 'ja' : 'nein';
   document.getElementById('doorSide').value = fp.doorSide || 'bottom';
 
@@ -6828,6 +6787,42 @@ function openDrawRoomDialog(shape) {
 
   document.body.appendChild(backdrop);
 
+  const drawRoomFunction =
+  document.getElementById('drawRoomFunction');
+
+const drawRoomTemperature =
+  document.getElementById('drawRoomTemperature');
+
+const drawRoomSpacing =
+  document.getElementById('drawRoomSpacing');
+
+const drawUnheatedWarning =
+  document.getElementById('drawUnheatedWarning');
+
+function updateDrawUnheatedWarning() {
+  const showWarning =
+    drawRoomFunction.value === 'unbeheizter Raum' &&
+    area >= 6;
+
+  drawUnheatedWarning.classList.toggle(
+    'hidden',
+    !showWarning
+  );
+}
+
+drawRoomFunction.addEventListener('change', () => {
+  if (drawRoomFunction.value === 'Bad') {
+    drawRoomTemperature.value = 24;
+    drawRoomSpacing.value = 'VA 100';
+  } else if (drawRoomFunction.value === 'Wohnraum') {
+    drawRoomTemperature.value = 20;
+  }
+
+  updateDrawUnheatedWarning();
+});
+
+updateDrawUnheatedWarning();
+
   document.getElementById('cancelDrawRoom').addEventListener('click', () => {
     backdrop.remove();
   });
@@ -6848,9 +6843,9 @@ if (
   area >= 6
 ) {
   const confirmed = confirm(
-    'Achtung: Räume ab 6 m² müssen beheizt ausgeführt werden.\n\n' +
-    'Möchten Sie den Raum trotzdem als unbeheizten Raum übernehmen?'
-  );
+  'Achtung: Räume ab 6 m² müssen beheizt ausgeführt werden.\\n\\n' +
+  'Möchten Sie den Raum trotzdem als unbeheizten Raum übernehmen?'
+);
 
   if (!confirmed) return;
 }
