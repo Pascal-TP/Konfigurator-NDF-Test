@@ -7269,19 +7269,6 @@ document
   .addEventListener('change', handleTemplateUpload);
 
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
-document
-  .getElementById('workspace')
-  .addEventListener('click', (e) => {
-
-    if (mode === 'calibrate') {
-      e.preventDefault();
-      e.stopPropagation();
-
-      handleCalibrationClick(e);
-      return;
-    }
-
-    if (mode !== 'distributor') return;
 
   const workspace = document.getElementById('workspace');
   const rect = workspace.getBoundingClientRect();
