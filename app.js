@@ -6349,7 +6349,7 @@ function setMode(newMode) {
 
   if (mode === 'draw-lines') {
   createModeCursorLabel(
-    'Startpunkt setzen – danach weitere Wände anklicken'
+    'Startpunkt setzen – danach weitere Punkte anklicken - Endpunkt = Starpunkt'
   );
   }
 }
@@ -7481,6 +7481,9 @@ function handleLineDrawingClick(e) {
 
   if (lineDrawing.points.length === 0) {
     lineDrawing.points.push(mousePoint);
+
+removeModeCursorLabel();
+
     renderLineDrawing();
 
     return true;
@@ -7548,6 +7551,12 @@ function cancelLineDrawing() {
   document
     .getElementById('wallDrawingLayer')
     ?.remove();
+
+    if (mode === 'draw-lines') {
+    createModeCursorLabel(
+        'Startpunkt setzen – danach weitere Punkte anklicken - Endpunkt = Starpunkt'
+    );
+}
 }
 
 function removeLastLinePoint() {
