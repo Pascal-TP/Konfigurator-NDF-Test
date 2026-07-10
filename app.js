@@ -5365,6 +5365,7 @@ function openFloorplanWindow() {
     cursor: move;
     box-shadow: 0 8px 22px rgba(0,0,0,0.14);
     user-select: none;
+    box-sizing: border-box;
   }
 
   .room.heated-1 { background: #ecfdf3; }
@@ -5476,6 +5477,7 @@ function openFloorplanWindow() {
   pointer-events: none;
   z-index: 20;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .draw-dimension-cross {
@@ -7858,7 +7860,7 @@ if (
   removeLastLinePoint();
   return;
 }
-  
+
   if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
 
   e.preventDefault();
