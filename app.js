@@ -7570,11 +7570,7 @@ function cancelLineDrawing() {
     .getElementById('wallDrawingLayer')
     ?.remove();
 
-    if (mode === 'draw-lines') {
-    createModeCursorLabel(
-        'Startpunkt setzen – danach weitere Punkte anklicken - Endpunkt = Starpunkt'
-    );
-}
+  removeModeCursorLabel();
 }
 
 function removeLastLinePoint() {
