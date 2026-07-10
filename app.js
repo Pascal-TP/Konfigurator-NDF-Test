@@ -7840,11 +7840,11 @@ function finishCalibration() {
   saveTemplateToMainWindow();
 
   alert(
-    'Der Maßstab wurde kalibriert.\n\n' +
+    'Der Maßstab wurde kalibriert.\\n\\n' +
     formatNumber(pixelDistance, 1) +
     ' Pixel entsprechen ' +
     formatNumber(actualMeters, 2) +
-    ' Metern.\n\n' +
+    ' Metern.\\n\\n' +
     'Ermittelter Maßstab: ' +
     formatNumber(
       template.pixelsPerMeter,
@@ -7867,7 +7867,134 @@ function cancelCalibration() {
   renderFloor();
 }
 
-document.addEventListener('mousemove', moveModeHelpers);
+setMode('move');
+renderFloor();
+
+document
+  .getElementById('uploadTemplateBtn')
+  .addEventListener(
+    'click',
+    openTemplateFileDialog
+  );
+
+document
+  .getElementById('templateFileInput')
+  .addEventListener(
+    'change',
+    handleTemplateUpload
+  );
+
+document
+  .getElementById('workspace')
+  .addEventListener(
+    'mousedown',
+    startDraw
+  );
+
+document
+  .getElementById('workspace')
+  .addEventListener('click', (e) => {
+    if (mode === 'calibrate') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      handleCalibrationClick(e);
+      return;
+    }
+
+    if (mode !== 'distributor') return;
+
+    const workspace =
+      document.getElementById('workspace');
+
+    const rect =
+      workspace.getBoundingClientRect();
+
+    const x =
+      Math.round(
+        (
+          e.clientX -
+          rect.left +
+          workspace.scrollLeft -
+          21
+        ) / 10
+      ) * 10;
+
+    const y =
+      Math.round(
+        (
+          e.clientY -
+          rect.top +
+          workspace.scrollTop -
+          21
+        ) / 10
+      ) * 10;
+
+    const distributor = {
+      x,
+      y
+    };
+
+    const saved =
+      window.opener &&
+      typeof window.opener
+        .updateDistributorFromWindow ===
+        'function'
+        ? window.opener
+            .updateDistributorFromWindow(
+              activeFloorIndex,
+              distributor
+            )
+        : false;
+
+    if (!saved) {
+      alert(
+        'Der Verteiler konnte nicht im Haupt-Konfigurator gespeichert werden.'
+      );
+      return;
+    }
+
+    floorData[
+      activeFloorIndex
+    ].distributor = distributor;
+
+    setMode('move');
+    renderFloor();
+  });
+
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (
+      e.key !== 'Delete' &&
+      e.key !== 'Entf' &&
+      e.key !== 'Backspace'
+    ) {
+      return;
+    }
+
+    const activeTag =
+      document.activeElement
+        ?.tagName
+        ?.toLowerCase();
+
+    if (
+      activeTag === 'input' ||
+      activeTag === 'select' ||
+      activeTag === 'textarea'
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    deleteSelectedRoom();
+  }
+);
+
+document.addEventListener(
+  'mousemove',
+  moveModeHelpers
+);
 </script>
 </body>
 </html>
