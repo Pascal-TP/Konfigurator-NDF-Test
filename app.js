@@ -790,6 +790,18 @@ function createFloor() {
     name: 'Erdgeschoss',
     systemAssignment: null,
     floorplanDistributor: null,
+
+    floorplanTemplate: {
+      src: '',
+      fileName: '',
+      x: 40,
+      y: 40,
+      scale: 1,
+      opacity: 0.55,
+      locked: false,
+      pixelsPerMeter: null
+    },
+
     rooms: []
   };
 }
@@ -5128,6 +5140,19 @@ function addFloorFromFloorplan(floorName) {
 
   return {
     name: newFloor.name,
+    distributor: null,
+
+    template: {
+      src: '',
+      fileName: '',
+      x: 40,
+      y: 40,
+      scale: 1,
+      opacity: 0.55,
+      locked: false,
+      pixelsPerMeter: null
+    },
+
     rooms: []
   };
 }
@@ -5175,6 +5200,18 @@ function updateDistributorFromWindow(floorIndex, distributorData) {
   return true;
 }
 
+function updateFloorplanTemplateFromWindow(floorIndex, templateData) {
+  const floor = state.floors[floorIndex];
+  if (!floor) return false;
+
+  floor.floorplanTemplate = {
+    ...(floor.floorplanTemplate || {}),
+    ...templateData
+  };
+
+  return true;
+}
+
 function openFloorplanWindow() {
   const result = calculateTechnicalRecommendation();
 
@@ -5193,6 +5230,31 @@ function openFloorplanWindow() {
     return {
       name: getFloorLabel(floor, floorIndex),
       distributor: floor.floorplanDistributor || null,
+
+      template: {
+        src: floor.floorplanTemplate?.src || '',
+        fileName: floor.floorplanTemplate?.fileName || '',
+        x: Number.isFinite(
+          Number(floor.floorplanTemplate?.x)
+        )
+          ? Number(floor.floorplanTemplate.x)
+          : 40,
+
+        y: Number.isFinite(
+          Number(floor.floorplanTemplate?.y)
+        )
+          ? Number(floor.floorplanTemplate.y)
+          : 40,
+        scale: Number(floor.floorplanTemplate?.scale) || 1,
+        opacity:
+          floor.floorplanTemplate?.opacity !== undefined
+            ? Number(floor.floorplanTemplate.opacity)
+            : 0.55,
+        locked: Boolean(floor.floorplanTemplate?.locked),
+        pixelsPerMeter:
+          Number(floor.floorplanTemplate?.pixelsPerMeter) || null
+      },
+
       rooms: floor.rooms.map((room, roomIndex) => {
         const technicalRoom = result.rooms.find(r =>
           r.floor === getFloorLabel(floor, floorIndex) &&
@@ -5772,6 +5834,143 @@ function openFloorplanWindow() {
   color: #78350f;
 }
 
+.template-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  transform-origin: top left;
+  user-select: none;
+}
+
+.template-layer.unlocked {
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.template-layer.unlocked:active {
+  cursor: grabbing;
+}
+
+.template-layer.locked {
+  pointer-events: none;
+}
+
+.template-image {
+  display: block;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.room {
+  z-index: 10;
+}
+
+.draw-preview {
+  z-index: 20;
+}
+
+.template-controls {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid #d7d7d7;
+  border-radius: 14px;
+  background: white;
+}
+
+.template-controls h3 {
+  margin: 0;
+  color: #0b2a4a;
+}
+
+.template-control-row {
+  display: grid;
+  gap: 5px;
+}
+
+.template-control-row label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.template-control-row input[type="range"] {
+  width: 100%;
+}
+
+.template-value {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.template-button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.template-status {
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.template-status.warning {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
+.calibration-point {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px #dc2626;
+  transform: translate(-50%, -50%);
+  z-index: 80;
+  pointer-events: none;
+}
+
+.calibration-line {
+  position: absolute;
+  height: 3px;
+  background: #dc2626;
+  transform-origin: left center;
+  z-index: 79;
+  pointer-events: none;
+}
+
+.workspace.calibration-mode {
+  cursor: crosshair;
+}
+
+.workspace.template-move-mode {
+  cursor: default;
+}
+
+.template-empty-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px dashed #94a3b8;
+  color: #64748b;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .hidden {
   display: none !important;
 }
@@ -5781,6 +5980,16 @@ function openFloorplanWindow() {
 <header>
   <h1>Schematischer Grundriss</h1>
   <div class="toolbar">
+<button id="uploadTemplateBtn" type="button">
+  Vorlage hochladen
+</button>
+
+<input
+  id="templateFileInput"
+  type="file"
+  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+  hidden
+>
 <button id="moveModeBtn" onclick="setMode('move')" class="mode-btn active-mode">Raum verschieben</button>
 <button id="drawModeBtn" onclick="setMode('draw')" class="mode-btn">Raum zeichnen</button>
 <button id="doorModeBtn" onclick="setMode('door')" class="mode-btn">Tür setzen</button>
@@ -5797,6 +6006,7 @@ function openFloorplanWindow() {
   <div class="workspace" id="workspace"></div>
 
   <aside class="sidebar">
+  <div id="templateControls"></div>
   <div id="floorOverview"></div>
   <div id="roomCards"></div>
 </aside>
@@ -5813,7 +6023,14 @@ let draw = null;
 let modeCursorLabel = null;
 let distributorGhost = null;
 let distributorDrag = null;
-const METER_TO_PIXEL = 42;
+let templateDrag = null;
+
+let calibration = {
+  active: false,
+  points: []
+};
+
+const DEFAULT_PIXELS_PER_METER = 42;
 
 function getRoomSize(room) {
   const area = Math.max(Number(room.area) || 8, 4);
@@ -5823,8 +6040,8 @@ function getRoomSize(room) {
   const heightM = area / widthM;
 
   return {
-    width: widthM * METER_TO_PIXEL,
-    height: heightM * METER_TO_PIXEL
+    width: metersToPixels(widthM),
+height: metersToPixels(heightM)
   };
 }
 
@@ -5832,8 +6049,8 @@ function getRoomDimensions(room) {
   const widthPx = Number(room.floorplan?.width) || 1;
   const heightPx = Number(room.floorplan?.height) || 1;
 
-  const widthM = widthPx / METER_TO_PIXEL;
-  const heightM = heightPx / METER_TO_PIXEL;
+ const widthM = pixelsToMeters(widthPx);
+const heightM = pixelsToMeters(heightPx);
 
   return {
     widthM: widthM.toFixed(2).replace('.', ','),
@@ -5882,12 +6099,31 @@ function renderTabs() {
 }
 
 function setMode(newMode) {
+  const template = getActiveTemplate();
+
+  if (
+    newMode === 'draw' &&
+    template.src &&
+    !template.locked
+  ) {
+    alert(
+      'Bitte sperren Sie die Grundrissvorlage, bevor Sie Räume darüber zeichnen.'
+    );
+    return;
+  }
+
   mode = newMode;
 
   document.getElementById('moveModeBtn')?.classList.toggle('active-mode', mode === 'move');
   document.getElementById('drawModeBtn')?.classList.toggle('active-mode', mode === 'draw');
   document.getElementById('doorModeBtn')?.classList.toggle('active-mode', mode === 'door');
   document.getElementById('distributorModeBtn')?.classList.toggle('active-mode', mode === 'distributor');
+  document
+  .getElementById('workspace')
+  ?.classList.toggle(
+    'calibration-mode',
+    mode === 'calibrate'
+  );
 
   document.getElementById('workspace')?.classList.toggle('draw-mode', mode === 'draw');
   document.getElementById('workspace')?.classList.toggle('door-mode', mode === 'door');
@@ -5903,6 +6139,33 @@ function setMode(newMode) {
     createModeCursorLabel('Verteiler absetzen');
     createDistributorGhost();
   }
+}
+
+function startCalibration() {
+  const template = getActiveTemplate();
+
+  if (!template.src) {
+    alert(
+      'Bitte laden Sie zuerst eine Grundrissvorlage hoch.'
+    );
+    return;
+  }
+
+  if (!template.locked) {
+    alert(
+      'Bitte sperren Sie die Vorlage zunächst, damit sie während der Kalibrierung nicht versehentlich verschoben wird.'
+    );
+    return;
+  }
+
+  calibration.active = true;
+  calibration.points = [];
+
+  setMode('calibrate');
+
+  alert(
+    'Klicken Sie jetzt nacheinander auf die beiden Endpunkte einer bekannten Strecke.'
+  );
 }
 
 function createModeCursorLabel(text) {
@@ -6091,6 +6354,117 @@ function selectRoom(roomIndex) {
   }
 }
 
+function renderTemplate() {
+  const workspace = document.getElementById('workspace');
+  const template = getActiveTemplate();
+
+  if (!template.src) {
+    const hint = document.createElement('div');
+    hint.className = 'template-empty-hint';
+    hint.textContent =
+      'Noch keine Grundrissvorlage für diese Etage hochgeladen.';
+    workspace.appendChild(hint);
+    return;
+  }
+
+  const layer = document.createElement('div');
+
+  layer.id = 'templateLayer';
+  layer.className =
+    'template-layer ' +
+    (template.locked ? 'locked' : 'unlocked');
+
+  layer.style.left = template.x + 'px';
+  layer.style.top = template.y + 'px';
+  layer.style.opacity = String(template.opacity);
+  layer.style.transform =
+    'scale(' + template.scale + ')';
+
+  const image = document.createElement('img');
+
+  image.className = 'template-image';
+  image.src = template.src;
+  image.alt = template.fileName || 'Grundrissvorlage';
+  image.draggable = false;
+
+  layer.appendChild(image);
+
+  if (!template.locked) {
+    layer.addEventListener(
+      'mousedown',
+      startTemplateDrag
+    );
+  }
+
+  workspace.appendChild(layer);
+}
+
+function openTemplateFileDialog() {
+  document.getElementById('templateFileInput').click();
+}
+
+function handleTemplateUpload(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) return;
+
+  const allowedTypes = [
+    'image/jpeg',
+    'image/png'
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    alert(
+      'Bitte laden Sie eine JPG-, JPEG- oder PNG-Datei hoch.'
+    );
+
+    event.target.value = '';
+    return;
+  }
+
+  const maxFileSize = 12 * 1024 * 1024;
+
+  if (file.size > maxFileSize) {
+    alert(
+      'Die Datei ist größer als 12 MB. Bitte verwenden Sie eine kleinere oder komprimierte Bilddatei.'
+    );
+
+    event.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    const template = getActiveTemplate();
+
+    template.src = String(reader.result || '');
+    template.fileName = file.name;
+    template.x = 40;
+    template.y = 40;
+    template.scale = 1;
+    template.opacity = 0.55;
+    template.locked = false;
+    template.pixelsPerMeter = null;
+
+    calibration.active = false;
+    calibration.points = [];
+
+    saveTemplateToMainWindow();
+    renderFloor();
+  };
+
+  reader.onerror = () => {
+    alert(
+      'Die Grundrissvorlage konnte nicht eingelesen werden.'
+    );
+  };
+
+  reader.readAsDataURL(file);
+
+  event.target.value = '';
+}
+
 function renderFloor() {
   renderTabs();
 
@@ -6099,6 +6473,8 @@ function renderFloor() {
 
   workspace.innerHTML = '';
   selectedRoomIndex = null;
+
+  renderTemplate();
 
   floor.rooms.forEach((room, roomIndex) => {
     initRoomPosition(room, roomIndex);
@@ -6123,7 +6499,7 @@ function renderFloor() {
 
     const dimensions = getRoomDimensions(room);
 
-div.innerHTML =
+ div.innerHTML =
   '<div class="dimension-cross">' +
     '<div class="dim-line dim-horizontal"></div>' +
     '<div class="dim-line dim-vertical"></div>' +
@@ -6136,18 +6512,18 @@ div.innerHTML =
 
     if (room.floorplan.doorEnabled) {
   div.appendChild(createDoor(room));
-}
+ }
 
-['nw', 'ne', 'sw', 'se'].forEach((pos) => {
+ ['nw', 'ne', 'sw', 'se'].forEach((pos) => {
   const handle = document.createElement('div');
   handle.className = 'resize-handle ' + pos;
   handle.dataset.resize = pos;
   handle.addEventListener('mousedown', startResize);
   div.appendChild(handle);
-});
+ });
 
-div.addEventListener('mousedown', startDrag);
-div.addEventListener('click', (e) => {
+ div.addEventListener('mousedown', startDrag);
+ div.addEventListener('click', (e) => {
   if (e.target.classList.contains('resize-handle')) return;
 
   if (mode === 'door') {
@@ -6157,12 +6533,13 @@ div.addEventListener('click', (e) => {
   }
 
   selectRoom(roomIndex);
-});
+ });
 
     workspace.appendChild(div);
   });
 
     renderDistributor();
+    renderTemplateControls();
     renderSidebar();
 }
 
@@ -6348,6 +6725,11 @@ function openDoorDialog(roomIndex) {
 function setFloor(index) {
   activeFloorIndex = index;
   selectedRoomIndex = null;
+
+  calibration.active = false;
+  calibration.points = [];
+
+  setMode('move');
   renderFloor();
 }
 
@@ -6381,79 +6763,45 @@ function addFloorFromPlan() {
 
   document.body.appendChild(backdrop);
 
-  const drawRoomFunction =
-  document.getElementById('drawRoomFunction');
+  document
+    .getElementById('cancelDrawFloor')
+    .addEventListener('click', () => {
+      backdrop.remove();
+    });
 
-const drawRoomTemperature =
-  document.getElementById('drawRoomTemperature');
+  document
+    .getElementById('saveDrawFloor')
+    .addEventListener('click', () => {
+      const floorName =
+        document.getElementById('drawFloorName').value;
 
-const drawRoomSpacing =
-  document.getElementById('drawRoomSpacing');
+      if (!floorName) {
+        alert('Bitte eine Etage auswählen.');
+        return;
+      }
 
-const drawUnheatedWarning =
-  document.getElementById('drawUnheatedWarning');
+      const newFloor =
+        window.opener &&
+        typeof window.opener.addFloorFromFloorplan === 'function'
+          ? window.opener.addFloorFromFloorplan(floorName)
+          : null;
 
-function updateDrawUnheatedWarning() {
-  const showWarning =
-    drawRoomFunction.value === 'unbeheizter Raum' &&
-    area >= 6;
+      if (!newFloor) {
+        alert(
+          'Die Etage konnte nicht im Haupt-Konfigurator angelegt werden.'
+        );
+        return;
+      }
 
-  drawUnheatedWarning.classList.toggle(
-    'hidden',
-    !showWarning
-  );
-}
+      floorData.push(newFloor);
+      activeFloorIndex = floorData.length - 1;
+      selectedRoomIndex = null;
 
-drawRoomFunction.addEventListener('change', () => {
-  if (drawRoomFunction.value === 'Bad') {
-    drawRoomTemperature.value = 24;
-    drawRoomSpacing.value = 'VA 100';
-  } else if (drawRoomFunction.value === 'Wohnraum') {
-    drawRoomTemperature.value = 20;
+      backdrop.remove();
 
-    if (
-      drawRoomSpacing.value === 'VA 200' &&
-      window.opener?.state?.heatSource === 'Wärmepumpe'
-    ) {
-      drawRoomSpacing.value = 'VA 150';
-    }
-  }
-
-  updateDrawUnheatedWarning();
-});
-
-updateDrawUnheatedWarning();
-
-  document.getElementById('cancelDrawFloor').addEventListener('click', () => {
-    backdrop.remove();
-  });
-
-  document.getElementById('saveDrawFloor').addEventListener('click', () => {
-    const floorName = document.getElementById('drawFloorName').value;
-
-    if (!floorName) {
-      alert('Bitte eine Etage auswählen.');
-      return;
-    }
-
-    const newFloor =
-      window.opener &&
-      typeof window.opener.addFloorFromFloorplan === 'function'
-        ? window.opener.addFloorFromFloorplan(floorName)
-        : null;
-
-    if (!newFloor) {
-      alert('Die Etage konnte nicht im Haupt-Konfigurator angelegt werden.');
-      return;
-    }
-
-    floorData.push(newFloor);
-    activeFloorIndex = floorData.length - 1;
-    selectedRoomIndex = null;
-
-    backdrop.remove();
-    renderFloor();
-  });
+      setMode('move');
+      renderFloor();
+    });
 }
 
 function startDrag(e) {
@@ -6544,14 +6892,14 @@ function onResize(e) {
     newX = resize.origX + dx;
   }
 
-  let newWidthM = newWidthPx / METER_TO_PIXEL;
+  let newWidthM = pixelsToMeters(newWidthPx);
   newWidthM = Math.max(minWidthM, Math.min(maxWidthM, newWidthM));
 
   const areaM2 = Math.max(Number(resize.room.area) || 1, 1);
   const newHeightM = areaM2 / newWidthM;
 
-  newWidthPx = newWidthM * METER_TO_PIXEL;
-  const newHeightPx = newHeightM * METER_TO_PIXEL;
+  newWidthPx = metersToPixels(newWidthM);
+const newHeightPx = metersToPixels(newHeightM);
 
   if (resize.handle.includes('n')) {
     newY = resize.origY + (resize.origHeight - newHeightPx);
@@ -6640,8 +6988,8 @@ function onDraw(e) {
   draw.preview.style.width = width + 'px';
   draw.preview.style.height = height + 'px';
 
-  const widthM = width / METER_TO_PIXEL;
-  const heightM = height / METER_TO_PIXEL;
+  const widthM = pixelsToMeters(width);
+const heightM = pixelsToMeters(height);
   const areaM2 = widthM * heightM;
 
   const widthText = draw.preview.querySelector('.dim-width');
@@ -6673,8 +7021,9 @@ function stopDraw() {
 }
 
 function calculateDrawnArea(widthPx, heightPx) {
-  const widthM = widthPx / METER_TO_PIXEL;
-  const heightM = heightPx / METER_TO_PIXEL;
+  const widthM = pixelsToMeters(widthPx);
+  const heightM = pixelsToMeters(heightPx);
+
   return widthM * heightM;
 }
 
@@ -6908,12 +7257,31 @@ function autoArrange() {
   renderFloor();
 }
 
-renderFloor();
 setMode('move');
+renderFloor();
+
+document
+  .getElementById('uploadTemplateBtn')
+  .addEventListener('click', openTemplateFileDialog);
+
+document
+  .getElementById('templateFileInput')
+  .addEventListener('change', handleTemplateUpload);
 
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
-document.getElementById('workspace').addEventListener('click', (e) => {
-  if (mode !== 'distributor') return;
+document
+  .getElementById('workspace')
+  .addEventListener('click', (e) => {
+
+    if (mode === 'calibrate') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      handleCalibrationClick(e);
+      return;
+    }
+
+    if (mode !== 'distributor') return;
 
   const workspace = document.getElementById('workspace');
   const rect = workspace.getBoundingClientRect();
@@ -6950,6 +7318,554 @@ document.addEventListener('keydown', (e) => {
 
   deleteSelectedRoom();
 });
+
+function getActiveFloor() {
+  return floorData[activeFloorIndex];
+}
+
+function getActiveTemplate() {
+  const floor = getActiveFloor();
+
+  if (!floor.template) {
+    floor.template = {
+      src: '',
+      fileName: '',
+      x: 40,
+      y: 40,
+      scale: 1,
+      opacity: 0.55,
+      locked: false,
+      pixelsPerMeter: null
+    };
+  }
+
+  return floor.template;
+}
+
+function getPixelsPerMeter() {
+  const template = getActiveTemplate();
+  return Number(template.pixelsPerMeter) || DEFAULT_PIXELS_PER_METER;
+}
+
+function pixelsToMeters(pixels) {
+  return pixels / getPixelsPerMeter();
+}
+
+function metersToPixels(meters) {
+  return meters * getPixelsPerMeter();
+}
+
+function saveTemplateToMainWindow() {
+  const template = getActiveTemplate();
+
+  const saved =
+    window.opener &&
+    typeof window.opener.updateFloorplanTemplateFromWindow === 'function'
+      ? window.opener.updateFloorplanTemplateFromWindow(
+          activeFloorIndex,
+          structuredClone(template)
+        )
+      : false;
+
+  if (!saved) {
+    console.warn(
+      'Die Vorlagendaten konnten nicht im Haupt-Konfigurator gespeichert werden.'
+    );
+  }
+
+  return saved;
+}
+
+function resetCalibration() {
+  const template = getActiveTemplate();
+
+  template.pixelsPerMeter = null;
+  calibration.active = false;
+  calibration.points = [];
+
+  saveTemplateToMainWindow();
+}
+
+function formatNumber(value, decimals = 2) {
+  return Number(value)
+    .toFixed(decimals)
+    .replace('.', ',');
+}
+
+function startTemplateDrag(e) {
+  const template = getActiveTemplate();
+
+  if (template.locked) return;
+  if (mode !== 'move') return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  templateDrag = {
+    layer: e.currentTarget,
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: Number(template.x) || 0,
+    origY: Number(template.y) || 0
+  };
+
+  document.addEventListener(
+    'mousemove',
+    onTemplateDrag
+  );
+
+  document.addEventListener(
+    'mouseup',
+    stopTemplateDrag
+  );
+}
+
+function onTemplateDrag(e) {
+  if (!templateDrag) return;
+
+  const template = getActiveTemplate();
+
+  const dx = e.clientX - templateDrag.startX;
+  const dy = e.clientY - templateDrag.startY;
+
+  template.x = Math.round(templateDrag.origX + dx);
+  template.y = Math.round(templateDrag.origY + dy);
+
+  templateDrag.layer.style.left =
+    template.x + 'px';
+
+  templateDrag.layer.style.top =
+    template.y + 'px';
+}
+
+function stopTemplateDrag() {
+  if (!templateDrag) return;
+
+  document.removeEventListener(
+    'mousemove',
+    onTemplateDrag
+  );
+
+  document.removeEventListener(
+    'mouseup',
+    stopTemplateDrag
+  );
+
+  templateDrag = null;
+
+  saveTemplateToMainWindow();
+  renderTemplateControls();
+}
+
+function renderTemplateControls() {
+  const container =
+    document.getElementById('templateControls');
+
+  const template = getActiveTemplate();
+
+  if (!template.src) {
+    container.innerHTML =
+      '<div class="template-controls">' +
+        '<h3>Grundrissvorlage</h3>' +
+        '<div class="template-status">' +
+          'Laden Sie eine JPG-, JPEG- oder PNG-Datei hoch.' +
+        '</div>' +
+      '</div>';
+
+    return;
+  }
+
+  const scalePercent =
+    Math.round(template.scale * 100);
+
+  const opacityPercent =
+    Math.round(template.opacity * 100);
+
+  const calibrated =
+    Number(template.pixelsPerMeter) > 0;
+
+  container.innerHTML =
+    '<div class="template-controls">' +
+      '<h3>Grundrissvorlage</h3>' +
+
+      '<div class="template-status ' +
+        (calibrated ? '' : 'warning') +
+      '">' +
+        '<strong>' +
+          (template.fileName || 'Vorlage') +
+        '</strong><br>' +
+        (
+          calibrated
+            ? 'Maßstab kalibriert: ' +
+              formatNumber(
+                template.pixelsPerMeter,
+                2
+              ) +
+              ' Pixel pro Meter'
+            : 'Der Maßstab ist noch nicht kalibriert.'
+        ) +
+      '</div>' +
+
+      '<div class="template-control-row">' +
+        '<label for="templateScale">' +
+          'Größe: ' + scalePercent + ' %' +
+        '</label>' +
+        '<input ' +
+          'id="templateScale" ' +
+          'type="range" ' +
+          'min="20" ' +
+          'max="300" ' +
+          'step="1" ' +
+          'value="' + scalePercent + '"' +
+        '>' +
+      '</div>' +
+
+      '<div class="template-control-row">' +
+        '<label for="templateOpacity">' +
+          'Deckkraft: ' + opacityPercent + ' %' +
+        '</label>' +
+        '<input ' +
+          'id="templateOpacity" ' +
+          'type="range" ' +
+          'min="10" ' +
+          'max="100" ' +
+          'step="1" ' +
+          'value="' + opacityPercent + '"' +
+        '>' +
+      '</div>' +
+
+      '<div class="template-button-row">' +
+        '<button id="toggleTemplateLock" type="button">' +
+          (
+            template.locked
+              ? 'Vorlage entsperren'
+              : 'Vorlage sperren'
+          ) +
+        '</button>' +
+
+        '<button id="calibrateTemplateBtn" type="button">' +
+          'Maßstab kalibrieren' +
+        '</button>' +
+      '</div>' +
+
+      '<div class="template-button-row">' +
+        '<button id="resetTemplatePositionBtn" type="button">' +
+          'Position zurücksetzen' +
+        '</button>' +
+
+        '<button id="removeTemplateBtn" type="button">' +
+          'Vorlage entfernen' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+  document
+    .getElementById('templateScale')
+    .addEventListener('input', handleTemplateScale);
+
+  document
+    .getElementById('templateOpacity')
+    .addEventListener('input', handleTemplateOpacity);
+
+  document
+    .getElementById('toggleTemplateLock')
+    .addEventListener('click', toggleTemplateLock);
+
+  document
+    .getElementById('calibrateTemplateBtn')
+    .addEventListener('click', startCalibration);
+
+  document
+    .getElementById('resetTemplatePositionBtn')
+    .addEventListener(
+      'click',
+      resetTemplatePosition
+    );
+
+  document
+    .getElementById('removeTemplateBtn')
+    .addEventListener('click', removeTemplate);
+}
+
+function handleTemplateScale(e) {
+  const template = getActiveTemplate();
+
+  const previousScale =
+    Number(template.scale) || 1;
+
+  const newScale =
+    Number(e.target.value) / 100;
+
+  template.scale = newScale;
+
+  if (
+    Number(template.pixelsPerMeter) > 0 &&
+    previousScale > 0
+  ) {
+    template.pixelsPerMeter =
+      template.pixelsPerMeter *
+      (newScale / previousScale);
+  }
+
+  const layer =
+    document.getElementById('templateLayer');
+
+  if (layer) {
+    layer.style.transform =
+      'scale(' + template.scale + ')';
+  }
+
+  const label = document.querySelector(
+    'label[for="templateScale"]'
+  );
+
+  if (label) {
+    label.textContent =
+      'Größe: ' +
+      Math.round(template.scale * 100) +
+      ' %';
+  }
+
+  saveTemplateToMainWindow();
+}
+
+function handleTemplateOpacity(e) {
+  const template = getActiveTemplate();
+
+  template.opacity =
+    Number(e.target.value) / 100;
+
+  const layer =
+    document.getElementById('templateLayer');
+
+  if (layer) {
+    layer.style.opacity =
+      String(template.opacity);
+  }
+
+  const label = document.querySelector(
+  'label[for="templateOpacity"]'
+);
+
+if (label) {
+  label.textContent =
+    'Deckkraft: ' +
+    Math.round(template.opacity * 100) +
+    ' %';
+}
+
+saveTemplateToMainWindow();
+}
+
+function toggleTemplateLock() {
+  const template = getActiveTemplate();
+
+  template.locked = !template.locked;
+
+  saveTemplateToMainWindow();
+  renderFloor();
+}
+
+function resetTemplatePosition() {
+  const template = getActiveTemplate();
+
+  template.x = 40;
+  template.y = 40;
+  template.scale = 1;
+  template.pixelsPerMeter = null;
+
+  calibration.active = false;
+  calibration.points = [];
+
+  saveTemplateToMainWindow();
+  renderFloor();
+}
+
+function removeTemplate() {
+  const confirmed = confirm(
+    'Möchten Sie die Grundrissvorlage dieser Etage wirklich entfernen? Die bereits gezeichneten Räume bleiben erhalten.'
+  );
+
+  if (!confirmed) return;
+
+  const floor = getActiveFloor();
+
+  floor.template = {
+    src: '',
+    fileName: '',
+    x: 40,
+    y: 40,
+    scale: 1,
+    opacity: 0.55,
+    locked: false,
+    pixelsPerMeter: null
+  };
+
+  calibration.active = false;
+  calibration.points = [];
+
+  saveTemplateToMainWindow();
+  renderFloor();
+}
+
+function handleCalibrationClick(e) {
+  if (
+    mode !== 'calibrate' ||
+    !calibration.active
+  ) {
+    return false;
+  }
+
+  const workspace =
+    document.getElementById('workspace');
+
+  const rect =
+    workspace.getBoundingClientRect();
+
+  const point = {
+    x:
+      e.clientX -
+      rect.left +
+      workspace.scrollLeft,
+
+    y:
+      e.clientY -
+      rect.top +
+      workspace.scrollTop
+  };
+
+  calibration.points.push(point);
+
+  renderCalibrationMarkers();
+
+  if (calibration.points.length === 2) {
+    finishCalibration();
+  }
+
+  return true;
+}
+
+function renderCalibrationMarkers() {
+  const workspace =
+    document.getElementById('workspace');
+
+  workspace
+    .querySelectorAll(
+      '.calibration-point, .calibration-line'
+    )
+    .forEach((element) => element.remove());
+
+  calibration.points.forEach((point) => {
+    const marker =
+      document.createElement('div');
+
+    marker.className = 'calibration-point';
+    marker.style.left = point.x + 'px';
+    marker.style.top = point.y + 'px';
+
+    workspace.appendChild(marker);
+  });
+
+  if (calibration.points.length !== 2) return;
+
+  const [pointA, pointB] = calibration.points;
+
+  const dx = pointB.x - pointA.x;
+  const dy = pointB.y - pointA.y;
+
+  const distance =
+    Math.sqrt(dx * dx + dy * dy);
+
+  const angle =
+    Math.atan2(dy, dx) * 180 / Math.PI;
+
+  const line =
+    document.createElement('div');
+
+  line.className = 'calibration-line';
+  line.style.left = pointA.x + 'px';
+  line.style.top = pointA.y + 'px';
+  line.style.width = distance + 'px';
+  line.style.transform =
+    'rotate(' + angle + 'deg)';
+
+  workspace.appendChild(line);
+}
+
+function finishCalibration() {
+  const [pointA, pointB] = calibration.points;
+
+  const dx = pointB.x - pointA.x;
+  const dy = pointB.y - pointA.y;
+
+  const pixelDistance =
+    Math.sqrt(dx * dx + dy * dy);
+
+  const input = prompt(
+    'Wie lang ist diese Strecke tatsächlich in Metern? Beispiel: 4,25'
+  );
+
+  if (input === null) {
+    cancelCalibration();
+    return;
+  }
+
+  const actualMeters =
+    Number(
+      String(input)
+        .trim()
+        .replace(',', '.')
+    );
+
+  if (
+    !Number.isFinite(actualMeters) ||
+    actualMeters <= 0
+  ) {
+    alert(
+      'Bitte geben Sie ein gültiges Maß größer als 0 Meter ein.'
+    );
+
+    calibration.points = [];
+    renderCalibrationMarkers();
+    return;
+  }
+
+  const template = getActiveTemplate();
+
+  template.pixelsPerMeter =
+    pixelDistance / actualMeters;
+
+  calibration.active = false;
+
+  saveTemplateToMainWindow();
+
+  alert(
+    'Der Maßstab wurde kalibriert.\n\n' +
+    formatNumber(pixelDistance, 1) +
+    ' Pixel entsprechen ' +
+    formatNumber(actualMeters, 2) +
+    ' Metern.\n\n' +
+    'Ermittelter Maßstab: ' +
+    formatNumber(
+      template.pixelsPerMeter,
+      2
+    ) +
+    ' Pixel pro Meter.'
+  );
+
+  calibration.points = [];
+
+  setMode('move');
+  renderFloor();
+}
+
+function cancelCalibration() {
+  calibration.active = false;
+  calibration.points = [];
+
+  setMode('move');
+  renderFloor();
+}
 
 document.addEventListener('mousemove', moveModeHelpers);
 </script>
