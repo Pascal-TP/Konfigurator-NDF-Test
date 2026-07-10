@@ -5438,7 +5438,8 @@ function openFloorplanWindow() {
     font-size: 13px;
     line-height: 1.35;
 
-    color: #1f2937;
+    color: #1f2937 !important;
+  opacity: 1 !important;
     font-weight: 600;
 }
 
@@ -5447,7 +5448,8 @@ function openFloorplanWindow() {
     font-size: 15px;
     margin-bottom: 3px;
 
-    color: #1f2937;
+    color: #1f2937 !important;
+  opacity: 1 !important;
 }
 
   .door {
@@ -5686,7 +5688,7 @@ function openFloorplanWindow() {
   position: absolute;
   inset: 14px;
   pointer-events: none;
-  opacity: 0.42;
+  opacity: 0.8;
   z-index: 1;
 }
 
