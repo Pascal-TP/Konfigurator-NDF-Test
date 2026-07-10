@@ -7217,24 +7217,6 @@ const drawRoomSpacing =
 const drawUnheatedWarning =
   document.getElementById('drawUnheatedWarning');
 
-floorplan: {
-  shapeType: shape.shapeType || 'rectangle',
-
-  x: shape.x,
-  y: shape.y,
-  width: shape.width,
-  height: shape.height,
-
-  points: Array.isArray(shape.points)
-    ? shape.points
-    : null,
-
-  doorEnabled: false,
-  doorSide: 'bottom',
-  doorPosition: 50,
-  doorWidth: 90
-}
-
 function updateDrawUnheatedWarning() {
   const showWarning =
     drawRoomFunction.value === 'unbeheizter Raum' &&
@@ -7299,10 +7281,17 @@ if (
   estrich: document.getElementById('drawRoomEstrich').value,
   floorCovering: document.getElementById('drawRoomFloorCovering').value,
   floorplan: {
+     shapeType: shape.shapeType || 'rectangle',
+
         x: shape.x,
         y: shape.y,
         width: shape.width,
         height: shape.height,
+
+points: Array.isArray(shape.points)
+    ? shape.points
+    : null,
+
         doorEnabled: false,
         doorSide: 'bottom',
         doorPosition: 50,
