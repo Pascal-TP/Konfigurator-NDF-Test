@@ -5974,6 +5974,18 @@ function openFloorplanWindow() {
 .hidden {
   display: none !important;
 }
+
+.workspace.draw-lines-mode {
+  cursor: crosshair;
+}
+
+.draw-mode-group {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
 </style>
 </head>
 <body>
@@ -5991,7 +6003,23 @@ function openFloorplanWindow() {
   hidden
 >
 <button id="moveModeBtn" onclick="setMode('move')" class="mode-btn active-mode">Raum verschieben</button>
-<button id="drawModeBtn" onclick="setMode('draw')" class="mode-btn">Raum zeichnen</button>
+<div class="draw-mode-group">
+  <button
+    id="drawRectModeBtn"
+    onclick="setMode('draw-rect')"
+    class="mode-btn"
+  >
+    Rechteck zeichnen
+  </button>
+
+  <button
+    id="drawLinesModeBtn"
+    onclick="setMode('draw-lines')"
+    class="mode-btn"
+  >
+    Wände zeichnen
+  </button>
+</div>
 <button id="doorModeBtn" onclick="setMode('door')" class="mode-btn">Tür setzen</button>
 <button id="distributorModeBtn" onclick="setMode('distributor')" class="mode-btn">Verteiler setzen</button>
 <button onclick="addFloorFromPlan()">Etage hinzufügen</button>
@@ -6101,11 +6129,15 @@ function renderTabs() {
 function setMode(newMode) {
   const template = getActiveTemplate();
 
-  if (
-    newMode === 'draw' &&
-    template.src &&
-    !template.locked
-  ) {
+  const isDrawingMode =
+  newMode === 'draw-rect' ||
+  newMode === 'draw-lines';
+
+if (
+  isDrawingMode &&
+  template.src &&
+  !template.locked
+) {
     alert(
       'Bitte sperren Sie die Grundrissvorlage, bevor Sie Räume darüber zeichnen.'
     );
@@ -6115,7 +6147,19 @@ function setMode(newMode) {
   mode = newMode;
 
   document.getElementById('moveModeBtn')?.classList.toggle('active-mode', mode === 'move');
-  document.getElementById('drawModeBtn')?.classList.toggle('active-mode', mode === 'draw');
+  document
+  .getElementById('drawRectModeBtn')
+  ?.classList.toggle(
+    'active-mode',
+    mode === 'draw-rect'
+  );
+
+document
+  .getElementById('drawLinesModeBtn')
+  ?.classList.toggle(
+    'active-mode',
+    mode === 'draw-lines'
+  );
   document.getElementById('doorModeBtn')?.classList.toggle('active-mode', mode === 'door');
   document.getElementById('distributorModeBtn')?.classList.toggle('active-mode', mode === 'distributor');
   document
@@ -6125,7 +6169,19 @@ function setMode(newMode) {
     mode === 'calibrate'
   );
 
-  document.getElementById('workspace')?.classList.toggle('draw-mode', mode === 'draw');
+  document
+  .getElementById('workspace')
+  ?.classList.toggle(
+    'draw-mode',
+    isDrawingMode
+  );
+
+document
+  .getElementById('workspace')
+  ?.classList.toggle(
+    'draw-lines-mode',
+    mode === 'draw-lines'
+  );
   document.getElementById('workspace')?.classList.toggle('door-mode', mode === 'door');
   document.getElementById('workspace')?.classList.toggle('distributor-mode', mode === 'distributor');
 
@@ -6927,7 +6983,7 @@ function stopResize() {
 }
 
 function startDraw(e) {
-  if (mode !== 'draw') return;
+  if (mode !== 'draw-rect') return;
   if (e.target !== document.getElementById('workspace')) return;
 
   const workspace = document.getElementById('workspace');
@@ -7017,7 +7073,14 @@ function stopDraw() {
 
   if (width < 60 || height < 60) return;
 
-  openDrawRoomDialog({ x, y, width, height });
+  openDrawRoomDialog({
+  shapeType: 'rectangle',
+  x,
+  y,
+  width,
+  height,
+  area: calculateDrawnArea(width, height)
+});
 }
 
 function calculateDrawnArea(widthPx, heightPx) {
@@ -7051,7 +7114,13 @@ function calculateDrawnTechnicalValues(room) {
 }
 
 function openDrawRoomDialog(shape) {
-  const area = calculateDrawnArea(shape.width, shape.height);
+  const area =
+  Number(shape.area) > 0
+    ? Number(shape.area)
+    : calculateDrawnArea(
+        shape.width,
+        shape.height
+      );
   const areaText = area.toFixed(2).replace('.', ',');
 
   const backdrop = document.createElement('div');
@@ -7147,6 +7216,24 @@ const drawRoomSpacing =
 
 const drawUnheatedWarning =
   document.getElementById('drawUnheatedWarning');
+
+floorplan: {
+  shapeType: shape.shapeType || 'rectangle',
+
+  x: shape.x,
+  y: shape.y,
+  width: shape.width,
+  height: shape.height,
+
+  points: Array.isArray(shape.points)
+    ? shape.points
+    : null,
+
+  doorEnabled: false,
+  doorSide: 'bottom',
+  doorPosition: 50,
+  doorWidth: 90
+}
 
 function updateDrawUnheatedWarning() {
   const showWarning =
