@@ -5368,6 +5368,66 @@ function openFloorplanWindow() {
     box-sizing: border-box;
   }
 
+.room.polygon-room {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.polygon-room-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.polygon-room-shape {
+  stroke: #273647;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+
+  pointer-events: all;
+  cursor: move;
+}
+
+.polygon-room.heated-1 .polygon-room-shape {
+  fill: rgba(236, 253, 243, 0.92);
+}
+
+.polygon-room.heated-2 .polygon-room-shape {
+  fill: rgba(255, 247, 214, 0.92);
+}
+
+.polygon-room.heated-3 .polygon-room-shape {
+  fill: rgba(253, 232, 232, 0.92);
+}
+
+.polygon-room.unheated .polygon-room-shape {
+  fill: rgba(241, 245, 249, 0.92);
+}
+
+.room.polygon-room {
+  border: none;
+  background: transparent !important;
+  box-shadow: none;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.polygon-room .dimension-cross {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.polygon-room.selected .polygon-room-shape {
+  stroke: #0066cc;
+  stroke-width: 5;
+}
+
   .room.heated-1 { background: #ecfdf3; }
   .room.heated-2 { background: #fff7d6; }
   .room.heated-3 { background: #fde8e8; }
@@ -6593,6 +6653,62 @@ function handleTemplateUpload(event) {
   event.target.value = '';
 }
 
+function createPolygonRoomSvg(room) {
+  const floorplan = room.floorplan || {};
+  const points = Array.isArray(floorplan.points)
+    ? floorplan.points
+    : [];
+
+  if (points.length < 3) return null;
+
+  const width = Math.max(
+    Number(floorplan.width) || 1,
+    1
+  );
+
+  const height = Math.max(
+    Number(floorplan.height) || 1,
+    1
+  );
+
+  const svg = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'svg'
+  );
+
+  svg.classList.add('polygon-room-svg');
+
+  svg.setAttribute(
+    'viewBox',
+    '0 0 ' + width + ' ' + height
+  );
+
+  svg.setAttribute(
+    'preserveAspectRatio',
+    'none'
+  );
+
+  const polygon = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'polygon'
+  );
+
+  polygon.classList.add('polygon-room-shape');
+
+  polygon.setAttribute(
+    'points',
+    points
+      .map((point) => {
+        return point.x + ',' + point.y;
+      })
+      .join(' ')
+  );
+
+  svg.appendChild(polygon);
+
+  return svg;
+}
+
 function renderFloor() {
   renderTabs();
 
@@ -6618,47 +6734,106 @@ function renderFloor() {
             ? 'heated-2'
             : 'heated-3';
 
-    div.className = 'room ' + circuitClass;
-    div.dataset.roomIndex = roomIndex;
-    div.style.left = room.floorplan.x + 'px';
-    div.style.top = room.floorplan.y + 'px';
-    div.style.width = room.floorplan.width + 'px';
-    div.style.height = room.floorplan.height + 'px';
+    const isPolygon =
+  room.floorplan?.shapeType === 'polygon' &&
+  Array.isArray(room.floorplan?.points) &&
+  room.floorplan.points.length >= 3;
 
-    const dimensions = getRoomDimensions(room);
+div.className =
+  'room ' +
+  circuitClass +
+  (isPolygon ? ' polygon-room' : '');
 
- div.innerHTML =
+div.dataset.roomIndex = roomIndex;
+
+div.style.left =
+  room.floorplan.x + 'px';
+
+div.style.top =
+  room.floorplan.y + 'px';
+
+div.style.width =
+  room.floorplan.width + 'px';
+
+div.style.height =
+  room.floorplan.height + 'px';
+
+const dimensions =
+  getRoomDimensions(room);
+
+div.innerHTML =
   '<div class="dimension-cross">' +
     '<div class="dim-line dim-horizontal"></div>' +
     '<div class="dim-line dim-vertical"></div>' +
-    '<div class="dim-text dim-width">' + dimensions.widthM + ' m</div>' +
-    '<div class="dim-text dim-height">' + dimensions.heightM + ' m</div>' +
+    '<div class="dim-text dim-width">' +
+      dimensions.widthM +
+      ' m</div>' +
+    '<div class="dim-text dim-height">' +
+      dimensions.heightM +
+      ' m</div>' +
   '</div>' +
+
   '<div class="room-label">' +
-    '<strong>' + room.name + '</strong>' +
+    '<strong>' +
+      room.name +
+    '</strong>' +
   '</div>';
 
-    if (room.floorplan.doorEnabled) {
-  div.appendChild(createDoor(room));
- }
+if (isPolygon) {
+  const svg =
+    createPolygonRoomSvg(room);
 
- ['nw', 'ne', 'sw', 'se'].forEach((pos) => {
-  const handle = document.createElement('div');
-  handle.className = 'resize-handle ' + pos;
-  handle.dataset.resize = pos;
-  handle.addEventListener('mousedown', startResize);
-  div.appendChild(handle);
- });
+  if (svg) {
+    div.insertBefore(
+      svg,
+      div.firstChild
+    );
+  }
+}
+
+  if (
+  !isPolygon &&
+  room.floorplan.doorEnabled
+) {
+  div.appendChild(createDoor(room));
+}
+
+if (!isPolygon) {
+  ['nw', 'ne', 'sw', 'se'].forEach((pos) => {
+    const handle =
+      document.createElement('div');
+
+    handle.className =
+      'resize-handle ' + pos;
+
+    handle.dataset.resize = pos;
+
+    handle.addEventListener(
+      'mousedown',
+      startResize
+    );
+
+    div.appendChild(handle);
+  });
+}
 
  div.addEventListener('mousedown', startDrag);
  div.addEventListener('click', (e) => {
   if (e.target.classList.contains('resize-handle')) return;
 
-  if (mode === 'door') {
-    e.stopPropagation();
-    openDoorDialog(roomIndex);
+ if (mode === 'door') {
+  e.stopPropagation();
+
+  if (isPolygon) {
+    alert(
+      'Türen an frei gezeichneten Raumkonturen werden im nächsten Erweiterungsschritt einzelnen Wandabschnitten zugeordnet.'
+    );
     return;
   }
+
+  openDoorDialog(roomIndex);
+  return;
+}
 
   selectRoom(roomIndex);
  });
@@ -7366,6 +7541,13 @@ function removeLastLinePoint() {
 }
 
 function calculatePolygonArea(points) {
+  if (
+    !Array.isArray(points) ||
+    points.length < 3
+  ) {
+    return 0;
+  }
+
   let areaPixels = 0;
 
   for (
@@ -7373,7 +7555,8 @@ function calculatePolygonArea(points) {
     index < points.length;
     index++
   ) {
-    const current = points[index];
+    const current =
+      points[index];
 
     const next =
       points[
@@ -7391,6 +7574,13 @@ function calculatePolygonArea(points) {
   const pixelsPerMeter =
     getPixelsPerMeter();
 
+  if (
+    !Number.isFinite(pixelsPerMeter) ||
+    pixelsPerMeter <= 0
+  ) {
+    return 0;
+  }
+
   return (
     areaPixels /
     (
@@ -7398,6 +7588,175 @@ function calculatePolygonArea(points) {
       pixelsPerMeter
     )
   );
+}
+
+function rangesOverlap(
+  startA,
+  endA,
+  startB,
+  endB
+) {
+  const minA = Math.min(startA, endA);
+  const maxA = Math.max(startA, endA);
+  const minB = Math.min(startB, endB);
+  const maxB = Math.max(startB, endB);
+
+  return (
+    Math.max(minA, minB) <=
+    Math.min(maxA, maxB)
+  );
+}
+
+function segmentsIntersect(
+  a1,
+  a2,
+  b1,
+  b2
+) {
+  const aHorizontal =
+    a1.y === a2.y;
+
+  const bHorizontal =
+    b1.y === b2.y;
+
+  /*
+   * Eine horizontale und eine vertikale Linie.
+   */
+  if (aHorizontal !== bHorizontal) {
+    const horizontalStart =
+      aHorizontal ? a1 : b1;
+
+    const horizontalEnd =
+      aHorizontal ? a2 : b2;
+
+    const verticalStart =
+      aHorizontal ? b1 : a1;
+
+    const verticalEnd =
+      aHorizontal ? b2 : a2;
+
+    return (
+      verticalStart.x >=
+        Math.min(
+          horizontalStart.x,
+          horizontalEnd.x
+        ) &&
+
+      verticalStart.x <=
+        Math.max(
+          horizontalStart.x,
+          horizontalEnd.x
+        ) &&
+
+      horizontalStart.y >=
+        Math.min(
+          verticalStart.y,
+          verticalEnd.y
+        ) &&
+
+      horizontalStart.y <=
+        Math.max(
+          verticalStart.y,
+          verticalEnd.y
+        )
+    );
+  }
+
+  /*
+   * Zwei horizontale Linien.
+   */
+  if (aHorizontal && bHorizontal) {
+    if (a1.y !== b1.y) return false;
+
+    return rangesOverlap(
+      a1.x,
+      a2.x,
+      b1.x,
+      b2.x
+    );
+  }
+
+  /*
+   * Zwei vertikale Linien.
+   */
+  if (a1.x !== b1.x) return false;
+
+  return rangesOverlap(
+    a1.y,
+    a2.y,
+    b1.y,
+    b2.y
+  );
+}
+
+function polygonHasSelfIntersections(points) {
+  if (
+    !Array.isArray(points) ||
+    points.length < 4
+  ) {
+    return false;
+  }
+
+  const segments = [];
+
+  for (
+    let index = 0;
+    index < points.length;
+    index++
+  ) {
+    segments.push({
+      start: points[index],
+      end:
+        points[
+          (index + 1) %
+          points.length
+        ]
+    });
+  }
+
+  for (
+    let firstIndex = 0;
+    firstIndex < segments.length;
+    firstIndex++
+  ) {
+    for (
+      let secondIndex =
+        firstIndex + 1;
+      secondIndex < segments.length;
+      secondIndex++
+    ) {
+      const segmentsAreNeighbours =
+        secondIndex === firstIndex + 1 ||
+        (
+          firstIndex === 0 &&
+          secondIndex ===
+            segments.length - 1
+        );
+
+      if (segmentsAreNeighbours) {
+        continue;
+      }
+
+      const segmentA =
+        segments[firstIndex];
+
+      const segmentB =
+        segments[secondIndex];
+
+      if (
+        segmentsIntersect(
+          segmentA.start,
+          segmentA.end,
+          segmentB.start,
+          segmentB.end
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function createPolygonShape(points) {
@@ -7429,10 +7788,93 @@ function createPolygonShape(points) {
   };
 }
 
+function simplifyOrthogonalPoints(points) {
+  if (
+    !Array.isArray(points) ||
+    points.length < 3
+  ) {
+    return points || [];
+  }
+
+  const cleaned = [];
+
+  points.forEach((point) => {
+    const previous =
+      cleaned[cleaned.length - 1];
+
+    if (
+      previous &&
+      previous.x === point.x &&
+      previous.y === point.y
+    ) {
+      return;
+    }
+
+    cleaned.push({
+      x: point.x,
+      y: point.y
+    });
+  });
+
+  let changed = true;
+
+  while (
+    changed &&
+    cleaned.length >= 3
+  ) {
+    changed = false;
+
+    for (
+      let index = 0;
+      index < cleaned.length;
+      index++
+    ) {
+      const previous =
+        cleaned[
+          (
+            index -
+            1 +
+            cleaned.length
+          ) %
+          cleaned.length
+        ];
+
+      const current =
+        cleaned[index];
+
+      const next =
+        cleaned[
+          (index + 1) %
+          cleaned.length
+        ];
+
+      const sameHorizontal =
+        previous.y === current.y &&
+        current.y === next.y;
+
+      const sameVertical =
+        previous.x === current.x &&
+        current.x === next.x;
+
+      if (
+        sameHorizontal ||
+        sameVertical
+      ) {
+        cleaned.splice(index, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return cleaned;
+}
+
 function closeLineDrawing() {
-  const points = [
-    ...lineDrawing.points
-  ];
+  const points =
+  simplifyOrthogonalPoints(
+    lineDrawing.points
+  );
 
   if (points.length < 3) {
     alert(
@@ -7454,8 +7896,18 @@ function closeLineDrawing() {
     );
     return;
   }
+  
+    if (
+  polygonHasSelfIntersections(points)
+) {
+  alert(
+    'Die gezeichnete Raumkontur überschneidet sich selbst. Bitte entfernen Sie den letzten Punkt oder zeichnen Sie die betroffene Wand neu.'
+  );
 
-  const shape =
+  return;
+}
+
+const shape =
     createPolygonShape(points);
 
   if (
