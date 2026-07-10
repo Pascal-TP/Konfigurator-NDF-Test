@@ -6382,10 +6382,31 @@ function startCalibration() {
 }
 
 function createModeCursorLabel(text) {
-  modeCursorLabel = document.createElement('div');
-  modeCursorLabel.className = 'mode-cursor-label';
+  removeModeCursorLabel();
+
+  modeCursorLabel =
+    document.createElement('div');
+
+  modeCursorLabel.className =
+    'mode-cursor-label';
+
   modeCursorLabel.textContent = text;
-  document.body.appendChild(modeCursorLabel);
+
+  document.body.appendChild(
+    modeCursorLabel
+  );
+}
+
+function removeModeCursorLabel() {
+  /*
+   * Entfernt auch versehentlich früher erzeugte
+   * Hinweisfelder, auf die die Variable nicht mehr zeigt.
+   */
+  document
+    .querySelectorAll('.mode-cursor-label')
+    .forEach((label) => label.remove());
+
+  modeCursorLabel = null;
 }
 
 function createDistributorGhost() {
@@ -6396,10 +6417,7 @@ function createDistributorGhost() {
 }
 
 function removeModeHelpers() {
-  if (modeCursorLabel) {
-    modeCursorLabel.remove();
-    modeCursorLabel = null;
-  }
+  removeModeCursorLabel();
 
   if (distributorGhost) {
     distributorGhost.remove();
