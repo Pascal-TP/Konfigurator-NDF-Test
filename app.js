@@ -5382,6 +5382,24 @@ function openFloorplanWindow() {
   height: 100%;
   overflow: visible;
   pointer-events: none;
+  z-index: 1;
+}
+
+.polygon-room .room-label {
+  position: relative;
+  z-index: 5;
+  color: #1f2937;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.polygon-room .dimension-cross {
+  z-index: 4;
+}
+
+.polygon-room .room-label strong {
+  color: #1f2937;
+  opacity: 1;
 }
 
 .polygon-room-shape {
