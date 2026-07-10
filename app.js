@@ -7270,31 +7270,6 @@ document
 
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
 
-  const workspace = document.getElementById('workspace');
-  const rect = workspace.getBoundingClientRect();
-
-  const x = Math.round((e.clientX - rect.left + workspace.scrollLeft - 21) / 10) * 10;
-  const y = Math.round((e.clientY - rect.top + workspace.scrollTop - 21) / 10) * 10;
-
-  const distributor = { x, y };
-
-  const saved =
-    window.opener &&
-    typeof window.opener.updateDistributorFromWindow === 'function'
-      ? window.opener.updateDistributorFromWindow(activeFloorIndex, distributor)
-      : false;
-
-  if (!saved) {
-    alert('Der Verteiler konnte nicht im Haupt-Konfigurator gespeichert werden.');
-    return;
-  }
-
-  floorData[activeFloorIndex].distributor = distributor;
-
-  setMode('move');
-  renderFloor();
-});
-
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
 
