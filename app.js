@@ -297,6 +297,7 @@ function roomIsHeated(room) {
 }
 
 function getRoomLabel(room, index) {
+  if (!room) return `Raum ${index + 1}`;
   return room.name || `Raum ${index + 1}`;
 }
 
@@ -2090,15 +2091,15 @@ function renderFloors() {
       });
 
       removeRoomBtn.disabled = false;
-removeRoomBtn.classList.remove('disabled-button');
+      removeRoomBtn.classList.remove('disabled-button');
 
-removeRoomBtn.addEventListener('click', () => {
-  state.floors[floorIndex].rooms.splice(roomIndex, 1);
-  renderFloors();
-  renderTechnicalRecommendation();
-  updateSummary();
-  updateNextButtonAndStepHint();
-});
+      removeRoomBtn.addEventListener('click', () => {
+        state.floors[floorIndex].rooms.splice(roomIndex, 1);
+        renderFloors();
+        renderTechnicalRecommendation();
+        updateSummary();
+        updateNextButtonAndStepHint();
+      });
 
       const canRemoveRoom = state.floors[floorIndex].rooms.length > 1;
 
@@ -2290,6 +2291,41 @@ function renderRoomSummaryCards() {
   }
 
   const activeFloor = state.floors[state.activeSummaryFloorIndex];
+
+  if (!activeFloor || !activeFloor.rooms || activeFloor.rooms.length === 0) {
+    const tabsHtml = `
+    <div class="summary-floor-tabs">
+      ${state.floors.map((floor, index) => {
+      const floorLabel = getFloorLabel(floor, index);
+      const activeClass = index === state.activeSummaryFloorIndex ? 'active' : '';
+
+      return `
+          <button type="button" class="summary-floor-tab ${activeClass}" data-summary-floor-index="${index}">
+            ${floorLabel}
+          </button>
+        `;
+    }).join('')}
+    </div>
+  `;
+
+    summaryRooms.innerHTML = `
+    ${tabsHtml}
+    <div class="summary-floor-card">
+      <div class="summary-floor-title">${getFloorLabel(activeFloor, state.activeSummaryFloorIndex)}</div>
+      <div class="muted">In dieser Etage sind noch keine Räume angelegt.</div>
+    </div>
+  `;
+
+    document.querySelectorAll('.summary-floor-tab').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.activeSummaryFloorIndex = Number(button.dataset.summaryFloorIndex);
+        state.activeSummaryRoomIndex = 0;
+        renderRoomSummaryCards();
+      });
+    });
+
+    return;
+  }
 
   if (state.activeSummaryRoomIndex >= activeFloor.rooms.length) {
     state.activeSummaryRoomIndex = 0;
