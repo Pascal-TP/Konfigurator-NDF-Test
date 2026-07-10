@@ -5437,13 +5437,18 @@ function openFloorplanWindow() {
     padding: 8px;
     font-size: 13px;
     line-height: 1.35;
-  }
+
+    color: #1f2937;
+    font-weight: 600;
+}
 
   .room-label strong {
     display: block;
     font-size: 15px;
     margin-bottom: 3px;
-  }
+
+    color: #1f2937;
+}
 
   .door {
     position: absolute;
