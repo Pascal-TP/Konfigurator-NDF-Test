@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NDF Konfigurator</title>
   <link rel="icon" href="./favicon.ico" type="image/x-icon">
-  <link rel="stylesheet" href="style.css?v=9.28.26" />
+  <link rel="stylesheet" href="style.css?v=10.28.26" />
   <script src="./libs/jspdf.umd.min.js"></script>
 </head>
 
@@ -1002,7 +1002,15 @@
             </div>
             <button id="assignThermostatBtn" type="button" class="hidden">Thermostat dem Raum zuweisen</button>
             <button id="assignDistributionBtn" type="button" class="hidden">Verteilertechnik dem Raum zuweisen</button>
-            <button id="assignExtraInsulationBtn" type="button" class="hidden">Zusatzdämmung dem Raum zuweisen</button>
+            <div class="btn-group system-buttons">
+              <button id="assignExtraInsulationToFloorBtn" type="button" class="secondary hidden">
+                Zusatzdämmung der Etage zuweisen
+              </button>
+
+              <button id="assignExtraInsulationBtn" type="button" class="hidden">
+                Zusatzdämmung dem Raum zuweisen
+              </button>
+            </div>
           </div>
 
           <div class="btn-group"><button type="button" id="nextBtn">Weiter</button></div>
@@ -1093,6 +1101,12 @@
             <option>Bad</option>
             <option>unbeheizter Raum</option>
           </select></div>
+
+        <div class="field">
+          <label>Rauminnentemperatur °C</label>
+          <input type="number" class="room-temperature" min="5" max="35" step="0.5" value="20" />
+        </div>
+
         <div class="field"><label>Verlegeabstand</label><select class="room-spacing">
             <option value="VA 150" selected>VA 150</option>
             <option value="VA 100">VA 100</option>
@@ -1159,7 +1173,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=9.28.26"></script>
+  <script src="app.js?v=10.28.26"></script>
   <div id="pdfContent" style="display:none;"></div>
 </body>
 

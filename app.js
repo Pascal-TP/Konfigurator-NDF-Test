@@ -108,6 +108,7 @@ const assignDistributionNoneBtn = document.getElementById('assignDistributionNon
 const extraInsulationFloorSelect = document.getElementById('extraInsulationFloorSelect');
 const extraInsulationRoomSelect = document.getElementById('extraInsulationRoomSelect');
 const assignExtraInsulationBtn = document.getElementById('assignExtraInsulationBtn');
+const assignExtraInsulationToFloorBtn = document.getElementById('assignExtraInsulationToFloorBtn');
 const assignExtraInsulationNoneBtn = document.getElementById('assignExtraInsulationNoneBtn');
 const systemPointerFloor = document.getElementById('systemPointerFloor');
 const systemPointerRoom = document.getElementById('systemPointerRoom');
@@ -797,6 +798,7 @@ function createRoom() {
   return {
     name: '',
     function: 'Wohnraum',
+    temperature: 20,
     spacing: 'VA 150',
     area: '',
     estrich: 'ja',
@@ -1003,6 +1005,14 @@ function showStep(step) {
 
   if (assignExtraInsulationBtn) {
     assignExtraInsulationBtn.classList.toggle('hidden', !isExtraInsulationStep || state.extraInsulationEnabled !== 'ja');
+  }
+
+  if (assignExtraInsulationToFloorBtn) {
+    assignExtraInsulationToFloorBtn.classList.toggle(
+      'hidden',
+      !isExtraInsulationStep ||
+      state.extraInsulationEnabled !== 'ja'
+    );
   }
 
   if (assignExtraInsulationNoneBtn) {
@@ -1680,14 +1690,21 @@ function updateAssignExtraInsulationButton() {
 
   const room = getSelectedExtraInsulationRoom();
 
+  const floorIndex =
+    Number(extraInsulationFloorSelect?.value || 0);
+
+  const floor = state.floors[floorIndex];
+
   if (state.extraInsulationEnabled !== 'ja') {
     assignExtraInsulationBtn.classList.add('hidden');
     assignExtraInsulationNoneBtn.classList.add('hidden');
+    assignExtraInsulationToFloorBtn?.classList.add('hidden');
     return;
   }
 
   assignExtraInsulationBtn.classList.remove('hidden');
   assignExtraInsulationNoneBtn.classList.remove('hidden');
+  assignExtraInsulationToFloorBtn?.classList.remove('hidden');
 
   if (!room || !roomIsHeated(room)) {
     assignExtraInsulationBtn.disabled = true;
@@ -1699,6 +1716,26 @@ function updateAssignExtraInsulationButton() {
 
   assignExtraInsulationBtn.disabled = !selection;
   assignExtraInsulationNoneBtn.disabled = false;
+
+  if (assignExtraInsulationToFloorBtn) {
+    const heatedRooms = floor?.rooms?.filter(roomIsHeated) || [];
+
+    assignExtraInsulationToFloorBtn.disabled =
+      !selection || heatedRooms.length === 0;
+
+    const floorAlreadyAssigned =
+      heatedRooms.length > 0 &&
+      heatedRooms.every(
+        (floorRoom) =>
+          floorRoom.assignments?.extraInsulation &&
+          !floorRoom.assignments.extraInsulation.none
+      );
+
+    assignExtraInsulationToFloorBtn.textContent =
+      floorAlreadyAssigned
+        ? 'Zusatzdämmung der Etage aktualisieren'
+        : 'Zusatzdämmung der Etage zuweisen';
+  }
 
   assignExtraInsulationBtn.textContent = room.assignments?.extraInsulation && !room.assignments.extraInsulation.none
     ? 'Zusatzdämmung des Raumes aktualisieren'
@@ -1751,6 +1788,70 @@ async function assignExtraInsulationToRoom() {
   renderExtraInsulationFloorSelect();
   updateAssignmentPointers();
   scrollAfterAssignment('extraInsulation');
+  updateAssignExtraInsulationButton();
+  updateSummary();
+}
+
+async function assignExtraInsulationToFloor() {
+  const floorIndex =
+    Number(extraInsulationFloorSelect.value || 0);
+
+  const floor = state.floors[floorIndex];
+
+  if (!floor) return;
+
+  const selection = getCurrentExtraInsulationSelection();
+
+  if (!selection) {
+    await showAppModal({
+      title: 'Auswahl unvollständig',
+      message:
+        'Bitte wählen Sie Material, Wärmeleitgruppe und Dicke der Zusatzdämmung aus.',
+      confirmText: 'OK'
+    });
+
+    return;
+  }
+
+  const heatedRooms = floor.rooms.filter(roomIsHeated);
+
+  if (heatedRooms.length === 0) {
+    await showAppModal({
+      title: 'Hinweis',
+      message:
+        'Diese Etage enthält keine beheizten Räume.',
+      confirmText: 'OK'
+    });
+
+    return;
+  }
+
+  const confirmed = await showAppModal({
+    title: 'Zusatzdämmung der Etage zuweisen?',
+    message:
+      `Möchten Sie die aktuell ausgewählte Zusatzdämmung wirklich allen beheizten Räumen der Etage "${getFloorLabel(floor, floorIndex)}" zuweisen? Bereits vorhandene Zuweisungen werden überschrieben.`,
+    confirmText: 'Ja',
+    cancelText: 'Abbrechen'
+  });
+
+  if (!confirmed) return;
+
+  heatedRooms.forEach((room) => {
+    room.assignments = room.assignments || {};
+
+    room.assignments.extraInsulation =
+      structuredClone(selection);
+  });
+
+  await showAppModal({
+    title: 'Gespeichert',
+    message:
+      `Die Zusatzdämmung wurde allen beheizten Räumen der Etage "${getFloorLabel(floor, floorIndex)}" zugewiesen.`,
+    confirmText: 'OK'
+  });
+
+  renderExtraInsulationFloorSelect();
+  updateAssignmentPointers();
   updateAssignExtraInsulationButton();
   updateSummary();
 }
@@ -1951,6 +2052,93 @@ function syncEstrichRangeRules() {
   });
 }
 
+function applyRoomSpacingRules(room, spacingSelect) {
+  if (!room || !spacingSelect) return;
+
+  const optionVa100 = spacingSelect.querySelector(
+    'option[value="VA 100"]'
+  );
+
+  const optionVa150 = spacingSelect.querySelector(
+    'option[value="VA 150"]'
+  );
+
+  const optionVa200 = spacingSelect.querySelector(
+    'option[value="VA 200"]'
+  );
+
+  // Zunächst Grundzustand herstellen.
+  [optionVa100, optionVa150, optionVa200].forEach((option) => {
+    if (!option) return;
+
+    option.disabled = false;
+    option.classList.remove('spacing-option-muted');
+    option.removeAttribute('title');
+  });
+
+  const isBathroom = room.function === 'Bad';
+  const isHeatPump = state.heatSource === 'Wärmepumpe';
+
+  /*
+   * Bad:
+   * VA 100 wird empfohlen und automatisch vorbelegt.
+   * VA 150 und VA 200 bleiben auswählbar,
+   * werden aber optisch als abweichende Auswahl dargestellt.
+   */
+  if (isBathroom) {
+    optionVa150?.classList.add('spacing-option-muted');
+    optionVa200?.classList.add('spacing-option-muted');
+
+    if (optionVa150) {
+      optionVa150.title =
+        'Für Bäder wird grundsätzlich VA 100 empfohlen.';
+    }
+
+    if (optionVa200) {
+      optionVa200.title =
+        'Für Bäder wird grundsätzlich VA 100 empfohlen.';
+    }
+  }
+
+  /*
+   * Wärmepumpe:
+   * VA 200 darf nicht ausgewählt werden.
+   */
+  if (isHeatPump && optionVa200) {
+    optionVa200.disabled = true;
+    optionVa200.title =
+      'VA 200 ist bei einer Wärmepumpe nicht verfügbar.';
+
+    if (room.spacing === 'VA 200') {
+      room.spacing = isBathroom ? 'VA 100' : 'VA 150';
+    }
+  }
+
+  spacingSelect.value = room.spacing || 'VA 150';
+}
+
+async function showUnheatedRoomAreaWarning(room) {
+  if (!room) return;
+
+  const area = Number(
+    String(room.area || '').replace(',', '.')
+  );
+
+  const shouldWarn =
+    room.function === 'unbeheizter Raum' &&
+    Number.isFinite(area) &&
+    area >= 6;
+
+  if (!shouldWarn) return;
+
+  await showAppModal({
+    title: 'Achtung',
+    message:
+      'Räume ab 6 m² müssen beheizt ausgeführt werden.',
+    confirmText: 'Bestätigen'
+  });
+}
+
 function renderFloors() {
   floorsContainer.innerHTML = '';
 
@@ -2003,6 +2191,7 @@ function renderFloors() {
 
       const roomNameInput = roomNode.querySelector('.room-name');
       const roomFunctionSelect = roomNode.querySelector('.room-function');
+      const roomTemperatureInput = roomNode.querySelector('.room-temperature');
       const roomSpacingSelect = roomNode.querySelector('.room-spacing');
       const roomAreaInput = roomNode.querySelector('.room-area');
       const roomEstrichSelect = roomNode.querySelector('.room-estrich');
@@ -2016,6 +2205,10 @@ function renderFloors() {
       roomNameInput.value = room.name;
       roomFunctionSelect.value = room.function;
       roomSpacingSelect.value = room.spacing;
+      applyRoomSpacingRules(room, roomSpacingSelect);
+      roomTemperatureInput.value =
+        Number(room.temperature) ||
+        (room.function === 'Bad' ? 24 : 20);
       roomAreaInput.value = room.area;
       roomEstrichSelect.value = room.estrich || 'ja';
       roomFloorCoveringSelect.value = room.floorCovering || 'Fliesen';
@@ -2039,22 +2232,87 @@ function renderFloors() {
         state.floors[floorIndex].rooms[roomIndex].name = e.target.value;
         updateSummary();
       });
-      roomFunctionSelect.addEventListener('change', (e) => {
-        state.floors[floorIndex].rooms[roomIndex].function = e.target.value;
+
+      roomTemperatureInput.addEventListener('input', (e) => {
+        const value = Number(e.target.value);
+
+        state.floors[floorIndex].rooms[roomIndex].temperature =
+          Number.isFinite(value) ? value : 20;
+
+        renderTechnicalRecommendation();
         updateSummary();
       });
+
+      roomFunctionSelect.addEventListener('change', async (e) => {
+        const currentRoom =
+          state.floors[floorIndex].rooms[roomIndex];
+
+        const previousFunction = currentRoom.function;
+        currentRoom.function = e.target.value;
+
+        /*
+         * Temperatur automatisch vorbelegen.
+         * Eine später manuell eingegebene Temperatur kann
+         * weiterhin verändert werden.
+         */
+        if (currentRoom.function === 'Bad') {
+          currentRoom.temperature = 24;
+          currentRoom.spacing = 'VA 100';
+        } else if (currentRoom.function === 'Wohnraum') {
+          currentRoom.temperature = 20;
+
+          if (
+            currentRoom.spacing === 'VA 200' &&
+            state.heatSource === 'Wärmepumpe'
+          ) {
+            currentRoom.spacing = 'VA 150';
+          }
+        } else if (
+          previousFunction === 'Bad' &&
+          currentRoom.function === 'unbeheizter Raum'
+        ) {
+          currentRoom.temperature = 20;
+        }
+
+        roomTemperatureInput.value = currentRoom.temperature;
+        applyRoomSpacingRules(currentRoom, roomSpacingSelect);
+
+        await showUnheatedRoomAreaWarning(currentRoom);
+
+        renderTechnicalRecommendation();
+        updateSummary();
+        updateNextButtonAndStepHint();
+      });
+
       roomSpacingSelect.addEventListener('change', (e) => {
-        state.floors[floorIndex].rooms[roomIndex].spacing = e.target.value;
+        const currentRoom =
+          state.floors[floorIndex].rooms[roomIndex];
+
+        currentRoom.spacing = e.target.value;
+
+        renderTechnicalRecommendation();
         updateSummary();
       });
+
       roomFloorCoveringSelect.addEventListener('change', (e) => {
         state.floors[floorIndex].rooms[roomIndex].floorCovering = e.target.value;
         renderTechnicalRecommendation();
         updateSummary();
       });
+
       roomAreaInput.addEventListener('input', (e) => {
-        state.floors[floorIndex].rooms[roomIndex].area = e.target.value;
+        state.floors[floorIndex].rooms[roomIndex].area =
+          e.target.value;
+
+        renderTechnicalRecommendation();
         updateSummary();
+      });
+
+      roomAreaInput.addEventListener('change', async () => {
+        const currentRoom =
+          state.floors[floorIndex].rooms[roomIndex];
+
+        await showUnheatedRoomAreaWarning(currentRoom);
       });
 
       roomDoorEnabledSelect.addEventListener('change', (e) => {
@@ -2099,19 +2357,6 @@ function renderFloors() {
         renderTechnicalRecommendation();
         updateSummary();
         updateNextButtonAndStepHint();
-      });
-
-      const canRemoveRoom = state.floors[floorIndex].rooms.length > 1;
-
-      removeRoomBtn.disabled = !canRemoveRoom;
-      removeRoomBtn.classList.toggle('disabled-button', !canRemoveRoom);
-
-      removeRoomBtn.addEventListener('click', () => {
-        if (state.floors[floorIndex].rooms.length <= 1) return;
-
-        state.floors[floorIndex].rooms.splice(roomIndex, 1);
-        renderFloors();
-        updateSummary();
       });
 
       roomsContainer.appendChild(roomNode);
@@ -2380,9 +2625,25 @@ function renderRoomSummaryCards() {
       <div class="summary-room-card active-room-card">
         <div class="summary-room-title">${roomLabel}</div>
 
-        <div class="summary-room-line"><span>Funktion</span><strong>${room.function || '-'}</strong></div>
-        <div class="summary-room-line"><span>VA</span><strong>${room.spacing || '-'}</strong></div>
-        <div class="summary-room-line"><span>Fläche</span><strong>${formatQuantity(area)} m²</strong></div>
+        <div class="summary-room-line">
+  <span>Funktion</span>
+  <strong>${room.function || '-'}</strong>
+</div>
+
+<div class="summary-room-line">
+  <span>Raumtemperatur</span>
+  <strong>${formatQuantity(Number(room.temperature) || 20)} °C</strong>
+</div>
+
+<div class="summary-room-line">
+  <span>VA</span>
+  <strong>${room.spacing || '-'}</strong>
+</div>
+
+<div class="summary-room-line">
+  <span>Fläche</span>
+  <strong>${formatQuantity(area)} m²</strong>
+</div>
 
         <div class="summary-room-calc">
   <div class="summary-room-section-title">Empfohlen:</div>
@@ -4821,6 +5082,9 @@ function addRoomFromFloorplan(floorIndex, roomData) {
 
   newRoom.name = roomData.name || '';
   newRoom.function = roomData.function || 'Wohnraum';
+  newRoom.temperature =
+    Number(roomData.temperature) ||
+    (newRoom.function === 'Bad' ? 24 : 20);
   newRoom.spacing = roomData.spacing || 'VA 150';
   newRoom.area = roomData.area || '';
   newRoom.estrich = roomData.estrich || 'ja';
@@ -6026,6 +6290,24 @@ function openDoorDialog(roomIndex) {
 
   document.body.appendChild(backdrop);
 
+  const drawRoomFunction =
+  document.getElementById('drawRoomFunction');
+
+const drawRoomTemperature =
+  document.getElementById('drawRoomTemperature');
+
+const drawRoomSpacing =
+  document.getElementById('drawRoomSpacing');
+
+drawRoomFunction.addEventListener('change', () => {
+  if (drawRoomFunction.value === 'Bad') {
+    drawRoomTemperature.value = 24;
+    drawRoomSpacing.value = 'VA 100';
+  } else if (drawRoomFunction.value === 'Wohnraum') {
+    drawRoomTemperature.value = 20;
+  }
+});
+
   document.getElementById('doorEnabled').value = fp.doorEnabled ? 'ja' : 'nein';
   document.getElementById('doorSide').value = fp.doorSide || 'bottom';
 
@@ -6416,6 +6698,11 @@ function openDrawRoomDialog(shape) {
         '</div>' +
 
         '<div class="draw-field">' +
+  '<label>Rauminnentemperatur °C</label>' +
+  '<input id="drawRoomTemperature" type="number" min="5" max="35" step="0.5" value="20">' +
+'</div>' +
+
+        '<div class="draw-field">' +
           '<label>Verlegeabstand</label>' +
           '<select id="drawRoomSpacing">' +
             '<option value="VA 100">VA 100</option>' +
@@ -6467,6 +6754,12 @@ function openDrawRoomDialog(shape) {
     const room = {
       name,
       function: document.getElementById('drawRoomFunction').value,
+
+temperature:
+  Number(
+    document.getElementById('drawRoomTemperature').value
+  ) || 20,
+
       spacing: document.getElementById('drawRoomSpacing').value,
       area: area.toFixed(2),
       estrich: document.getElementById('drawRoomEstrich').value,
@@ -6639,7 +6932,26 @@ document.querySelectorAll('#heatSourceChoices .choice-card').forEach((card) => {
   card.addEventListener('click', () => {
     state.heatSource = card.dataset.heatSource;
 
+    /*
+     * Bereits vorhandene Räume korrigieren,
+     * falls zuvor VA 200 gewählt war.
+     */
+    if (state.heatSource === 'Wärmepumpe') {
+      state.floors.forEach((floor) => {
+        floor.rooms.forEach((room) => {
+          if (room.spacing === 'VA 200') {
+            room.spacing =
+              room.function === 'Bad'
+                ? 'VA 100'
+                : 'VA 150';
+          }
+        });
+      });
+    }
+
     renderHeatSource();
+    renderFloors();
+    renderTechnicalRecommendation();
     updateSummary();
   });
 });
@@ -7030,6 +7342,13 @@ if (extraInsulationRoomSelect) {
 
 if (assignExtraInsulationBtn) {
   assignExtraInsulationBtn.addEventListener('click', assignExtraInsulationToRoom);
+}
+
+if (assignExtraInsulationToFloorBtn) {
+  assignExtraInsulationToFloorBtn.addEventListener(
+    'click',
+    assignExtraInsulationToFloor
+  );
 }
 
 if (assignExtraInsulationNoneBtn) {

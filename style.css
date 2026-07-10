@@ -1478,3 +1478,8 @@ button.disabled-button:hover {
 .floor-circuit-row strong {
   color: #0b2a4a;
 }
+
+.room-spacing option.spacing-option-muted {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
