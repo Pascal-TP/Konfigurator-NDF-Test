@@ -175,6 +175,28 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.room-input-grid {
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  align-items: end;
+}
+
+.room-input-grid .field {
+  min-width: 0;
+}
+
+.room-input-grid input,
+.room-input-grid select {
+  min-width: 0;
+  width: 100%;
+}
+
+.room-input-grid .field label {
+  line-height: 1.25;
+  min-height: 35px;
+  display: flex;
+  align-items: flex-end;
+}
+
 .form-grid.single,
 .form-grid.single-gap {
   grid-template-columns: 1fr;

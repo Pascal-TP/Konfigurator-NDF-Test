@@ -5756,6 +5756,25 @@ function openFloorplanWindow() {
   box-shadow: 0 8px 20px rgba(0,0,0,0.25);
   transform: translate(-21px, -21px);
 }
+
+.draw-warning {
+  margin: 12px 0;
+  padding: 11px 13px;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.draw-warning strong {
+  color: #78350f;
+}
+
+.hidden {
+  display: none !important;
+}
 </style>
 </head>
 <body>
@@ -6293,6 +6312,27 @@ function openDoorDialog(roomIndex) {
   const drawRoomFunction =
   document.getElementById('drawRoomFunction');
 
+const drawUnheatedWarning =
+  document.getElementById('drawUnheatedWarning');
+
+function updateDrawUnheatedWarning() {
+  const showWarning =
+    drawRoomFunction.value === 'unbeheizter Raum' &&
+    area >= 6;
+
+  drawUnheatedWarning.classList.toggle(
+    'hidden',
+    !showWarning
+  );
+}
+
+drawRoomFunction.addEventListener(
+  'change',
+  updateDrawUnheatedWarning
+);
+
+updateDrawUnheatedWarning();
+
 const drawRoomTemperature =
   document.getElementById('drawRoomTemperature');
 
@@ -6306,6 +6346,8 @@ drawRoomFunction.addEventListener('change', () => {
   } else if (drawRoomFunction.value === 'Wohnraum') {
     drawRoomTemperature.value = 20;
   }
+
+  updateDrawUnheatedWarning();
 });
 
   document.getElementById('doorEnabled').value = fp.doorEnabled ? 'ja' : 'nein';
@@ -6379,6 +6421,49 @@ function addFloorFromPlan() {
     '</div>';
 
   document.body.appendChild(backdrop);
+
+  const drawRoomFunction =
+  document.getElementById('drawRoomFunction');
+
+const drawRoomTemperature =
+  document.getElementById('drawRoomTemperature');
+
+const drawRoomSpacing =
+  document.getElementById('drawRoomSpacing');
+
+const drawUnheatedWarning =
+  document.getElementById('drawUnheatedWarning');
+
+function updateDrawUnheatedWarning() {
+  const showWarning =
+    drawRoomFunction.value === 'unbeheizter Raum' &&
+    area >= 6;
+
+  drawUnheatedWarning.classList.toggle(
+    'hidden',
+    !showWarning
+  );
+}
+
+drawRoomFunction.addEventListener('change', () => {
+  if (drawRoomFunction.value === 'Bad') {
+    drawRoomTemperature.value = 24;
+    drawRoomSpacing.value = 'VA 100';
+  } else if (drawRoomFunction.value === 'Wohnraum') {
+    drawRoomTemperature.value = 20;
+
+    if (
+      drawRoomSpacing.value === 'VA 200' &&
+      window.opener?.state?.heatSource === 'Wärmepumpe'
+    ) {
+      drawRoomSpacing.value = 'VA 150';
+    }
+  }
+
+  updateDrawUnheatedWarning();
+});
+
+updateDrawUnheatedWarning();
 
   document.getElementById('cancelDrawFloor').addEventListener('click', () => {
     backdrop.remove();
@@ -6669,7 +6754,11 @@ function openDrawRoomDialog(shape) {
       '<h3>Raum aus Grundriss übernehmen</h3>' +
       '<div class="draw-area-hint">Berechnete Fläche: ' + areaText + ' m²</div>' +
 
-      '<div class="draw-grid">' +
+'<div id="drawUnheatedWarning" class="draw-warning hidden">' +
+  '<strong>Achtung:</strong> Räume ab 6 m² müssen beheizt ausgeführt werden.' +
+'</div>' +
+
+'<div class="draw-grid">' +
       
       '<div class="draw-field">' +
   '<label>Raumbezeichnung</label>' +
@@ -6751,20 +6840,34 @@ function openDrawRoomDialog(shape) {
       return;
     }
 
+    const selectedFunction =
+  document.getElementById('drawRoomFunction').value;
+
+if (
+  selectedFunction === 'unbeheizter Raum' &&
+  area >= 6
+) {
+  const confirmed = confirm(
+    'Achtung: Räume ab 6 m² müssen beheizt ausgeführt werden.\n\n' +
+    'Möchten Sie den Raum trotzdem als unbeheizten Raum übernehmen?'
+  );
+
+  if (!confirmed) return;
+}
+
     const room = {
-      name,
-      function: document.getElementById('drawRoomFunction').value,
+  name,
+  function: selectedFunction,
+  temperature:
+    Number(
+      document.getElementById('drawRoomTemperature').value
+    ) || (selectedFunction === 'Bad' ? 24 : 20),
 
-temperature:
-  Number(
-    document.getElementById('drawRoomTemperature').value
-  ) || 20,
-
-      spacing: document.getElementById('drawRoomSpacing').value,
-      area: area.toFixed(2),
-      estrich: document.getElementById('drawRoomEstrich').value,
-      floorCovering: document.getElementById('drawRoomFloorCovering').value,
-      floorplan: {
+  spacing: document.getElementById('drawRoomSpacing').value,
+  area: area.toFixed(2),
+  estrich: document.getElementById('drawRoomEstrich').value,
+  floorCovering: document.getElementById('drawRoomFloorCovering').value,
+  floorplan: {
         x: shape.x,
         y: shape.y,
         width: shape.width,
