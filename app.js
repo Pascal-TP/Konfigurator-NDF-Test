@@ -5971,6 +5971,61 @@ function openFloorplanWindow() {
   pointer-events: none;
 }
 
+.wall-drawing-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.wall-drawing-line {
+  stroke: #dc2626;
+  stroke-width: 4;
+  stroke-linecap: square;
+  vector-effect: non-scaling-stroke;
+}
+
+.wall-preview-line {
+  stroke: #2563eb;
+  stroke-width: 3;
+  stroke-dasharray: 8 6;
+  vector-effect: non-scaling-stroke;
+}
+
+.wall-drawing-point {
+  fill: #ffffff;
+  stroke: #dc2626;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.wall-start-point {
+  fill: #22c55e;
+  stroke: #166534;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.wall-preview-point {
+  fill: #2563eb;
+  stroke: #ffffff;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.wall-drawing-hint {
+  position: absolute;
+  z-index: 90;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.92);
+  color: white;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .hidden {
   display: none !important;
 }
@@ -6048,6 +6103,11 @@ let mode = 'move';
 let drag = null;
 let resize = null;
 let draw = null;
+let lineDrawing = {
+  points: [],
+  previewLine: null,
+  previewPoint: null
+};
 let modeCursorLabel = null;
 let distributorGhost = null;
 let distributorDrag = null;
@@ -6127,17 +6187,21 @@ function renderTabs() {
 }
 
 function setMode(newMode) {
+ if (mode === 'draw-lines' && newMode !== 'draw-lines') {
+  cancelLineDrawing();
+ }
+
   const template = getActiveTemplate();
 
   const isDrawingMode =
   newMode === 'draw-rect' ||
   newMode === 'draw-lines';
 
-if (
+ if (
   isDrawingMode &&
   template.src &&
   !template.locked
-) {
+ ) {
     alert(
       'Bitte sperren Sie die Grundrissvorlage, bevor Sie Räume darüber zeichnen.'
     );
@@ -6154,7 +6218,7 @@ if (
     mode === 'draw-rect'
   );
 
-document
+ document
   .getElementById('drawLinesModeBtn')
   ?.classList.toggle(
     'active-mode',
@@ -6176,7 +6240,7 @@ document
     isDrawingMode
   );
 
-document
+ document
   .getElementById('workspace')
   ?.classList.toggle(
     'draw-lines-mode',
@@ -6194,6 +6258,12 @@ document
   if (mode === 'distributor') {
     createModeCursorLabel('Verteiler absetzen');
     createDistributorGhost();
+  }
+
+  if (mode === 'draw-lines') {
+  createModeCursorLabel(
+    'Startpunkt setzen – danach weitere Wände anklicken'
+  );
   }
 }
 
@@ -6982,6 +7052,425 @@ function stopResize() {
   resize = null;
 }
 
+function getWorkspacePoint(e) {
+  const workspace =
+    document.getElementById('workspace');
+
+  const rect =
+    workspace.getBoundingClientRect();
+
+  return {
+    x: Math.round(
+      (
+        e.clientX -
+        rect.left +
+        workspace.scrollLeft
+      ) / 10
+    ) * 10,
+
+    y: Math.round(
+      (
+        e.clientY -
+        rect.top +
+        workspace.scrollTop
+      ) / 10
+    ) * 10
+  };
+}
+
+function getOrthogonalPoint(startPoint, mousePoint) {
+  const dx =
+    Math.abs(mousePoint.x - startPoint.x);
+
+  const dy =
+    Math.abs(mousePoint.y - startPoint.y);
+
+  if (dx >= dy) {
+    return {
+      x: mousePoint.x,
+      y: startPoint.y
+    };
+  }
+
+  return {
+    x: startPoint.x,
+    y: mousePoint.y
+  };
+}
+
+function getWallDrawingLayer() {
+  const workspace =
+    document.getElementById('workspace');
+
+  let svg =
+    document.getElementById('wallDrawingLayer');
+
+  if (svg) return svg;
+
+  svg = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'svg'
+  );
+
+  svg.id = 'wallDrawingLayer';
+  svg.classList.add('wall-drawing-layer');
+
+  svg.setAttribute(
+    'width',
+    workspace.scrollWidth
+  );
+
+  svg.setAttribute(
+    'height',
+    workspace.scrollHeight
+  );
+
+  svg.setAttribute(
+    'viewBox',
+    '0 0 ' +
+      workspace.scrollWidth +
+      ' ' +
+      workspace.scrollHeight
+  );
+
+  workspace.appendChild(svg);
+
+  return svg;
+}
+
+function renderLineDrawing(mousePoint = null) {
+  const svg = getWallDrawingLayer();
+
+  svg.innerHTML = '';
+
+  const points = lineDrawing.points;
+
+  for (let index = 0; index < points.length - 1; index++) {
+    const pointA = points[index];
+    const pointB = points[index + 1];
+
+    const line =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'line'
+      );
+
+    line.setAttribute('x1', pointA.x);
+    line.setAttribute('y1', pointA.y);
+    line.setAttribute('x2', pointB.x);
+    line.setAttribute('y2', pointB.y);
+    line.setAttribute(
+      'class',
+      'wall-drawing-line'
+    );
+
+    svg.appendChild(line);
+  }
+
+  points.forEach((point, index) => {
+    const circle =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'circle'
+      );
+
+    circle.setAttribute('cx', point.x);
+    circle.setAttribute('cy', point.y);
+    circle.setAttribute('r', index === 0 ? 8 : 6);
+
+    circle.setAttribute(
+      'class',
+      index === 0
+        ? 'wall-start-point'
+        : 'wall-drawing-point'
+    );
+
+    svg.appendChild(circle);
+  });
+
+  if (points.length > 0 && mousePoint) {
+    const lastPoint =
+      points[points.length - 1];
+
+    const snappedPoint =
+      getOrthogonalPoint(
+        lastPoint,
+        mousePoint
+      );
+
+    const previewLine =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'line'
+      );
+
+    previewLine.setAttribute(
+      'x1',
+      lastPoint.x
+    );
+
+    previewLine.setAttribute(
+      'y1',
+      lastPoint.y
+    );
+
+    previewLine.setAttribute(
+      'x2',
+      snappedPoint.x
+    );
+
+    previewLine.setAttribute(
+      'y2',
+      snappedPoint.y
+    );
+
+    previewLine.setAttribute(
+      'class',
+      'wall-preview-line'
+    );
+
+    svg.appendChild(previewLine);
+
+    const previewPoint =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'circle'
+      );
+
+    previewPoint.setAttribute(
+      'cx',
+      snappedPoint.x
+    );
+
+    previewPoint.setAttribute(
+      'cy',
+      snappedPoint.y
+    );
+
+    previewPoint.setAttribute('r', 5);
+
+    previewPoint.setAttribute(
+      'class',
+      'wall-preview-point'
+    );
+
+    svg.appendChild(previewPoint);
+  }
+}
+
+function handleLineDrawingClick(e) {
+  if (mode !== 'draw-lines') return false;
+
+  const workspace =
+    document.getElementById('workspace');
+
+  if (
+    e.target !== workspace &&
+    e.target.id !== 'wallDrawingLayer'
+  ) {
+    return false;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const mousePoint =
+    getWorkspacePoint(e);
+
+  if (lineDrawing.points.length === 0) {
+    lineDrawing.points.push(mousePoint);
+    renderLineDrawing();
+
+    return true;
+  }
+
+  const lastPoint =
+    lineDrawing.points[
+      lineDrawing.points.length - 1
+    ];
+
+  const nextPoint =
+    getOrthogonalPoint(
+      lastPoint,
+      mousePoint
+    );
+
+  if (
+    nextPoint.x === lastPoint.x &&
+    nextPoint.y === lastPoint.y
+  ) {
+    return true;
+  }
+
+  const firstPoint =
+    lineDrawing.points[0];
+
+  const closeDistance =
+    Math.hypot(
+      nextPoint.x - firstPoint.x,
+      nextPoint.y - firstPoint.y
+    );
+
+  if (
+    lineDrawing.points.length >= 3 &&
+    closeDistance <= 15
+  ) {
+    closeLineDrawing();
+    return true;
+  }
+
+  lineDrawing.points.push(nextPoint);
+  renderLineDrawing();
+
+  return true;
+}
+
+function handleLineDrawingMove(e) {
+  if (mode !== 'draw-lines') return;
+
+  if (lineDrawing.points.length === 0) {
+    return;
+  }
+
+  const mousePoint =
+    getWorkspacePoint(e);
+
+  renderLineDrawing(mousePoint);
+}
+
+function cancelLineDrawing() {
+  lineDrawing.points = [];
+  lineDrawing.previewLine = null;
+  lineDrawing.previewPoint = null;
+
+  document
+    .getElementById('wallDrawingLayer')
+    ?.remove();
+}
+
+function removeLastLinePoint() {
+  if (lineDrawing.points.length === 0) {
+    return;
+  }
+
+  lineDrawing.points.pop();
+
+  if (lineDrawing.points.length === 0) {
+    cancelLineDrawing();
+    return;
+  }
+
+  renderLineDrawing();
+}
+
+function calculatePolygonArea(points) {
+  let areaPixels = 0;
+
+  for (
+    let index = 0;
+    index < points.length;
+    index++
+  ) {
+    const current = points[index];
+
+    const next =
+      points[
+        (index + 1) % points.length
+      ];
+
+    areaPixels +=
+      current.x * next.y -
+      next.x * current.y;
+  }
+
+  areaPixels =
+    Math.abs(areaPixels) / 2;
+
+  const pixelsPerMeter =
+    getPixelsPerMeter();
+
+  return (
+    areaPixels /
+    (
+      pixelsPerMeter *
+      pixelsPerMeter
+    )
+  );
+}
+
+function createPolygonShape(points) {
+  const xValues =
+    points.map((point) => point.x);
+
+  const yValues =
+    points.map((point) => point.y);
+
+  const minX = Math.min(...xValues);
+  const minY = Math.min(...yValues);
+  const maxX = Math.max(...xValues);
+  const maxY = Math.max(...yValues);
+
+  const relativePoints =
+    points.map((point) => ({
+      x: point.x - minX,
+      y: point.y - minY
+    }));
+
+  return {
+    shapeType: 'polygon',
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+    points: relativePoints,
+    area: calculatePolygonArea(points)
+  };
+}
+
+function closeLineDrawing() {
+  const points = [
+    ...lineDrawing.points
+  ];
+
+  if (points.length < 3) {
+    alert(
+      'Für einen Raum werden mindestens drei Eckpunkte benötigt.'
+    );
+    return;
+  }
+
+  const firstPoint = points[0];
+  const lastPoint =
+    points[points.length - 1];
+
+  if (
+    firstPoint.x !== lastPoint.x &&
+    firstPoint.y !== lastPoint.y
+  ) {
+    alert(
+      'Die letzte Wand kann nicht waagerecht oder senkrecht zum Startpunkt geschlossen werden. Bitte setzen Sie vorher einen weiteren Eckpunkt.'
+    );
+    return;
+  }
+
+  const shape =
+    createPolygonShape(points);
+
+  if (
+    shape.width < 30 ||
+    shape.height < 30 ||
+    shape.area <= 0
+  ) {
+    alert(
+      'Der gezeichnete Raum ist zu klein oder ungültig.'
+    );
+    return;
+  }
+
+  cancelLineDrawing();
+  openDrawRoomDialog(shape);
+}
+
 function startDraw(e) {
   if (mode !== 'draw-rect') return;
   if (e.target !== document.getElementById('workspace')) return;
@@ -7347,6 +7836,29 @@ document
 document.getElementById('workspace').addEventListener('mousedown', startDraw);
 
 document.addEventListener('keydown', (e) => {
+
+  if (
+  mode === 'draw-lines' &&
+  e.key === 'Escape'
+) {
+  e.preventDefault();
+  cancelLineDrawing();
+  return;
+}
+
+if (
+  mode === 'draw-lines' &&
+  (
+    e.key === 'Backspace' ||
+    e.key === 'Delete' ||
+    e.key === 'Entf'
+  )
+) {
+  e.preventDefault();
+  removeLastLinePoint();
+  return;
+}
+  
   if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
 
   e.preventDefault();
@@ -7932,6 +8444,12 @@ document
 document
   .getElementById('workspace')
   .addEventListener('click', (e) => {
+
+    if (mode === 'draw-lines') {
+  handleLineDrawingClick(e);
+  return;
+  }
+
     if (mode === 'calibrate') {
       e.preventDefault();
       e.stopPropagation();
@@ -8028,6 +8546,13 @@ document.addEventListener(
     deleteSelectedRoom();
   }
 );
+
+document
+  .getElementById('workspace')
+  .addEventListener(
+    'mousemove',
+    handleLineDrawingMove
+  );
 
 document.addEventListener(
   'mousemove',
