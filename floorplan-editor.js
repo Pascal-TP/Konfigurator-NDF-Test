@@ -2733,25 +2733,92 @@ function handleLineDrawingClick(e) {
       lineDrawing.points.length - 1
     ];
 
-  const nextPoint =
-    getOrthogonalPoint(
-      lastPoint,
-      mousePoint
-    );
-
-  if (
-    nextPoint.x === lastPoint.x &&
-    nextPoint.y === lastPoint.y
-  ) {
-    return true;
-  }
-
-    const closingInfo =
+  /*
+ * Zuerst prüfen, ob der Raum geschlossen
+ * werden soll.
+ */
+const closingInfo =
   getClosingInfo(
     lineDrawing.points,
     mousePoint
   );
 
+if (closingInfo) {
+  /*
+   * Sonderfall:
+   * Abschluss auf der ersten Wand.
+   */
+  if (
+    closingInfo.type ===
+    'first-wall'
+  ) {
+    lineDrawing.points[0] = {
+      x: closingInfo.targetPoint.x,
+      y: closingInfo.targetPoint.y
+    };
+
+    const lastStoredPoint =
+      lineDrawing.points[
+        lineDrawing.points.length - 1
+      ];
+
+    if (
+      lastStoredPoint.x !==
+        closingInfo.targetPoint.x ||
+      lastStoredPoint.y !==
+        closingInfo.targetPoint.y
+    ) {
+      lineDrawing.points.push({
+        x: closingInfo.targetPoint.x,
+        y: closingInfo.targetPoint.y
+      });
+    }
+  } else {
+    /*
+     * Normaler Abschluss am ursprünglichen
+     * Startpunkt.
+     */
+    closingInfo.previewPoints.forEach(
+      (point) => {
+        const lastStoredPoint =
+          lineDrawing.points[
+            lineDrawing.points.length - 1
+          ];
+
+        if (
+          lastStoredPoint.x !== point.x ||
+          lastStoredPoint.y !== point.y
+        ) {
+          lineDrawing.points.push({
+            x: point.x,
+            y: point.y
+          });
+        }
+      }
+    );
+  }
+
+  closeLineDrawing();
+  return true;
+}
+
+/*
+ * Erst wenn kein Abschluss erkannt wurde,
+ * wird der nächste normale Eckpunkt berechnet.
+ */
+const nextPoint =
+  getOrthogonalPoint(
+    lastPoint,
+    mousePoint
+  );
+
+if (
+  nextPoint.x === lastPoint.x &&
+  nextPoint.y === lastPoint.y
+) {
+  return true;
+}
+  
 if (closingInfo) {
   /*
    * Sonderfall:
