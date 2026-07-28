@@ -1029,6 +1029,8 @@ let selectedRoomIndex = null;
 let mode = 'move';
 
 const SNAP_GRID_SIZE = 10;
+const CLOSE_SNAP_DISTANCE = 25;
+
 let snapEnabled = true;
 
 let drag = null;
@@ -2208,6 +2210,66 @@ function getOrthogonalPoint(startPoint, mousePoint) {
   };
 }
 
+function getOrthogonalClosingPoints(points) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return [];
+  }
+
+  const firstPoint =
+    points[0];
+
+  const lastPoint =
+    points[points.length - 1];
+
+  /*
+   * Start- und Endpunkt liegen bereits auf derselben
+   * horizontalen oder vertikalen Achse.
+   */
+  if (
+    firstPoint.x === lastPoint.x ||
+    firstPoint.y === lastPoint.y
+  ) {
+    return [
+      {
+        x: firstPoint.x,
+        y: firstPoint.y
+      }
+    ];
+  }
+
+  const previousPoint =
+    points.length >= 2
+      ? points[points.length - 2]
+      : null;
+
+  /*
+   * War die letzte gezeichnete Wand waagerecht,
+   * wird zunächst senkrecht weitergeführt.
+   */
+  const previousWasHorizontal =
+    previousPoint &&
+    previousPoint.y === lastPoint.y;
+
+  const cornerPoint =
+    previousWasHorizontal
+      ? {
+          x: lastPoint.x,
+          y: firstPoint.y
+        }
+      : {
+          x: firstPoint.x,
+          y: lastPoint.y
+        };
+
+  return [
+    cornerPoint,
+    {
+      x: firstPoint.x,
+      y: firstPoint.y
+    }
+  ];
+}
+
 function getWallDrawingLayer() {
   const workspace =
     document.getElementById('workspace');
@@ -2249,15 +2311,27 @@ function getWallDrawingLayer() {
 }
 
 function renderLineDrawing(mousePoint = null) {
-  const svg = getWallDrawingLayer();
+  const svg =
+    getWallDrawingLayer();
 
   svg.innerHTML = '';
 
-  const points = lineDrawing.points;
+  const points =
+    lineDrawing.points;
 
-  for (let index = 0; index < points.length - 1; index++) {
-    const pointA = points[index];
-    const pointB = points[index + 1];
+  /*
+   * Bereits fest gesetzte Wände zeichnen.
+   */
+  for (
+    let index = 0;
+    index < points.length - 1;
+    index++
+  ) {
+    const pointA =
+      points[index];
+
+    const pointB =
+      points[index + 1];
 
     const line =
       document.createElementNS(
@@ -2265,10 +2339,26 @@ function renderLineDrawing(mousePoint = null) {
         'line'
       );
 
-    line.setAttribute('x1', pointA.x);
-    line.setAttribute('y1', pointA.y);
-    line.setAttribute('x2', pointB.x);
-    line.setAttribute('y2', pointB.y);
+    line.setAttribute(
+      'x1',
+      pointA.x
+    );
+
+    line.setAttribute(
+      'y1',
+      pointA.y
+    );
+
+    line.setAttribute(
+      'x2',
+      pointB.x
+    );
+
+    line.setAttribute(
+      'y2',
+      pointB.y
+    );
+
     line.setAttribute(
       'class',
       'wall-drawing-line'
@@ -2277,6 +2367,9 @@ function renderLineDrawing(mousePoint = null) {
     svg.appendChild(line);
   }
 
+  /*
+   * Bereits gesetzte Eckpunkte zeichnen.
+   */
   points.forEach((point, index) => {
     const circle =
       document.createElementNS(
@@ -2284,9 +2377,20 @@ function renderLineDrawing(mousePoint = null) {
         'circle'
       );
 
-    circle.setAttribute('cx', point.x);
-    circle.setAttribute('cy', point.y);
-    circle.setAttribute('r', index === 0 ? 8 : 6);
+    circle.setAttribute(
+      'cx',
+      point.x
+    );
+
+    circle.setAttribute(
+      'cy',
+      point.y
+    );
+
+    circle.setAttribute(
+      'r',
+      index === 0 ? 8 : 6
+    );
 
     circle.setAttribute(
       'class',
@@ -2298,74 +2402,151 @@ function renderLineDrawing(mousePoint = null) {
     svg.appendChild(circle);
   });
 
-  if (points.length > 0 && mousePoint) {
-    const lastPoint =
-      points[points.length - 1];
-
-    const snappedPoint =
-      getOrthogonalPoint(
-        lastPoint,
-        mousePoint
-      );
-
-    const previewLine =
-      document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'line'
-      );
-
-    previewLine.setAttribute(
-      'x1',
-      lastPoint.x
-    );
-
-    previewLine.setAttribute(
-      'y1',
-      lastPoint.y
-    );
-
-    previewLine.setAttribute(
-      'x2',
-      snappedPoint.x
-    );
-
-    previewLine.setAttribute(
-      'y2',
-      snappedPoint.y
-    );
-
-    previewLine.setAttribute(
-      'class',
-      'wall-preview-line'
-    );
-
-    svg.appendChild(previewLine);
-
-    const previewPoint =
-      document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'circle'
-      );
-
-    previewPoint.setAttribute(
-      'cx',
-      snappedPoint.x
-    );
-
-    previewPoint.setAttribute(
-      'cy',
-      snappedPoint.y
-    );
-
-    previewPoint.setAttribute('r', 5);
-
-    previewPoint.setAttribute(
-      'class',
-      'wall-preview-point'
-    );
-
-    svg.appendChild(previewPoint);
+  /*
+   * Noch keine Vorschau nötig, solange kein Punkt
+   * gesetzt wurde oder keine Mausposition vorhanden ist.
+   */
+  if (
+    points.length === 0 ||
+    !mousePoint
+  ) {
+    return;
   }
+
+  const lastPoint =
+    points[points.length - 1];
+
+  const firstPoint =
+    points[0];
+
+  const closeDistance =
+    Math.hypot(
+      mousePoint.x - firstPoint.x,
+      mousePoint.y - firstPoint.y
+    );
+
+  /*
+   * Erst ab drei gesetzten Punkten darf der Raum
+   * automatisch geschlossen werden.
+   */
+  const shouldPreviewClosing =
+    points.length >= 3 &&
+    closeDistance <=
+      CLOSE_SNAP_DISTANCE;
+
+  /*
+   * Beim normalen Zeichnen enthält previewPoints
+   * nur einen Punkt.
+   *
+   * Beim automatischen Schließen können zwei Punkte
+   * enthalten sein:
+   * 1. automatisch ergänzter Eckpunkt
+   * 2. Startpunkt des Raumes
+   */
+  const previewPoints =
+    shouldPreviewClosing
+      ? getOrthogonalClosingPoints(
+          points
+        )
+      : [
+          getOrthogonalPoint(
+            lastPoint,
+            mousePoint
+          )
+        ];
+
+  let previewStart =
+    lastPoint;
+
+  /*
+   * Alle Vorschauwände zeichnen.
+   * Beim automatischen Abschluss sind dies
+   * gegebenenfalls zwei Wände.
+   */
+  previewPoints.forEach(
+    (previewEnd) => {
+      const previewLine =
+        document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'line'
+        );
+
+      previewLine.setAttribute(
+        'x1',
+        previewStart.x
+      );
+
+      previewLine.setAttribute(
+        'y1',
+        previewStart.y
+      );
+
+      previewLine.setAttribute(
+        'x2',
+        previewEnd.x
+      );
+
+      previewLine.setAttribute(
+        'y2',
+        previewEnd.y
+      );
+
+      previewLine.setAttribute(
+        'class',
+        'wall-preview-line'
+      );
+
+      svg.appendChild(
+        previewLine
+      );
+
+      previewStart =
+        previewEnd;
+    }
+  );
+
+  const finalPreviewPoint =
+    previewPoints[
+      previewPoints.length - 1
+    ];
+
+  if (!finalPreviewPoint) {
+    return;
+  }
+
+  const previewPoint =
+    document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'circle'
+    );
+
+  previewPoint.setAttribute(
+    'cx',
+    finalPreviewPoint.x
+  );
+
+  previewPoint.setAttribute(
+    'cy',
+    finalPreviewPoint.y
+  );
+
+  previewPoint.setAttribute(
+    'r',
+    shouldPreviewClosing
+      ? 8
+      : 5
+  );
+
+  previewPoint.setAttribute(
+    'class',
+    shouldPreviewClosing
+      ? 'wall-start-point'
+      : 'wall-preview-point'
+  );
+
+  svg.appendChild(
+    previewPoint
+  );
 }
 
 function handleLineDrawingClick(e) {
@@ -2416,18 +2597,41 @@ function handleLineDrawingClick(e) {
     lineDrawing.points[0];
 
   const closeDistance =
-    Math.hypot(
-      nextPoint.x - firstPoint.x,
-      nextPoint.y - firstPoint.y
-    );
+  Math.hypot(
+    mousePoint.x - firstPoint.x,
+    mousePoint.y - firstPoint.y
+  );
 
   if (
-    lineDrawing.points.length >= 3 &&
-    closeDistance <= 15
-  ) {
-    closeLineDrawing();
-    return true;
-  }
+  lineDrawing.points.length >= 3 &&
+  closeDistance <=
+    CLOSE_SNAP_DISTANCE
+) {
+  const closingPoints =
+    getOrthogonalClosingPoints(
+      lineDrawing.points
+    );
+
+  closingPoints.forEach((point) => {
+    const lastStoredPoint =
+      lineDrawing.points[
+        lineDrawing.points.length - 1
+      ];
+
+    /*
+     * Doppelte Punkte vermeiden.
+     */
+    if (
+      lastStoredPoint.x !== point.x ||
+      lastStoredPoint.y !== point.y
+    ) {
+      lineDrawing.points.push(point);
+    }
+  });
+
+  closeLineDrawing();
+  return true;
+}
 
   lineDrawing.points.push(nextPoint);
   renderLineDrawing();
@@ -2823,14 +3027,14 @@ function closeLineDrawing() {
     points[points.length - 1];
 
   if (
-    firstPoint.x !== lastPoint.x &&
-    firstPoint.y !== lastPoint.y
-  ) {
-    alert(
-      'Die letzte Wand kann nicht waagerecht oder senkrecht zum Startpunkt geschlossen werden. Bitte setzen Sie vorher einen weiteren Eckpunkt.'
-    );
-    return;
-  }
+  firstPoint.x !== lastPoint.x ||
+  firstPoint.y !== lastPoint.y
+) {
+  alert(
+    'Die Raumkontur konnte nicht vollständig geschlossen werden.'
+  );
+  return;
+}
   
     if (
   polygonHasSelfIntersections(points)
