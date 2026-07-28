@@ -348,6 +348,24 @@ function openFloorplanWindow() {
   border-radius: 999px;
 }
 
+.snap-toggle {
+  background: #e5e7eb;
+  color: #374151;
+  border: 2px solid transparent;
+}
+
+.snap-toggle.active {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #22c55e;
+}
+
+.snap-toggle:not(.active) {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #f87171;
+}
+
 .workspace.draw-mode {
   cursor: crosshair;
 }
@@ -951,6 +969,14 @@ function openFloorplanWindow() {
 <button id="uploadTemplateBtn" type="button">
   Vorlage hochladen
 </button>
+<button
+  id="snapToggleBtn"
+  type="button"
+  onclick="toggleSnap()"
+  class="snap-toggle active"
+>
+  Fang: EIN
+</button>
 
 <input
   id="templateFileInput"
@@ -1001,6 +1027,10 @@ const floorData = ${JSON.stringify(floorData)};
 let activeFloorIndex = 0;
 let selectedRoomIndex = null;
 let mode = 'move';
+
+const SNAP_GRID_SIZE = 10;
+let snapEnabled = true;
+
 let drag = null;
 let resize = null;
 let draw = null;
@@ -1166,6 +1196,36 @@ function setMode(newMode) {
     'Startpunkt setzen – danach weitere Punkte anklicken – Endpunkt = Startpunkt'
   );
   }
+}
+
+function toggleSnap() {
+  snapEnabled = !snapEnabled;
+
+  const button =
+    document.getElementById('snapToggleBtn');
+
+  if (!button) return;
+
+  button.textContent =
+    snapEnabled
+      ? 'Fang: EIN'
+      : 'Fang: AUS';
+
+  button.classList.toggle(
+    'active',
+    snapEnabled
+  );
+}
+
+function snapValue(value) {
+  if (!snapEnabled) {
+    return Math.round(value * 10) / 10;
+  }
+
+  return (
+    Math.round(value / SNAP_GRID_SIZE) *
+    SNAP_GRID_SIZE
+  );
 }
 
 function startCalibration() {
@@ -2112,22 +2172,19 @@ function getWorkspacePoint(e) {
   const rect =
     workspace.getBoundingClientRect();
 
-  return {
-    x: Math.round(
-      (
-        e.clientX -
-        rect.left +
-        workspace.scrollLeft
-      ) / 10
-    ) * 10,
+  const rawX =
+    e.clientX -
+    rect.left +
+    workspace.scrollLeft;
 
-    y: Math.round(
-      (
-        e.clientY -
-        rect.top +
-        workspace.scrollTop
-      ) / 10
-    ) * 10
+  const rawY =
+    e.clientY -
+    rect.top +
+    workspace.scrollTop;
+
+  return {
+    x: snapValue(rawX),
+    y: snapValue(rawY)
   };
 }
 
@@ -2818,8 +2875,21 @@ function startDraw(e) {
 
   const rect = workspace.getBoundingClientRect();
 
-  const startX = e.clientX - rect.left + workspace.scrollLeft;
-  const startY = e.clientY - rect.top + workspace.scrollTop;
+const rawStartX =
+  e.clientX -
+  rect.left +
+  workspace.scrollLeft;
+
+const rawStartY =
+  e.clientY -
+  rect.top +
+  workspace.scrollTop;
+
+const startX =
+  snapValue(rawStartX);
+
+const startY =
+  snapValue(rawStartY);
 
   const preview = document.createElement('div');
   preview.className = 'draw-preview';
@@ -2863,10 +2933,17 @@ function onDraw(e) {
   const rawWidth = Math.abs(currentX - draw.startX);
   const rawHeight = Math.abs(currentY - draw.startY);
 
-  const x = Math.round(rawX / 10) * 10;
-  const y = Math.round(rawY / 10) * 10;
-  const width = Math.round(rawWidth / 10) * 10;
-  const height = Math.round(rawHeight / 10) * 10;
+  const x =
+  snapValue(rawX);
+
+const y =
+  snapValue(rawY);
+
+const width =
+  snapValue(rawWidth);
+
+const height =
+  snapValue(rawHeight);
 
   draw.preview.style.left = x + 'px';
   draw.preview.style.top = y + 'px';
