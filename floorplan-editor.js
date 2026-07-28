@@ -2289,41 +2289,18 @@ function getClosingInfo(points, mousePoint) {
     points[points.length - 1];
 
   /*
-   * Möglichkeit 1:
-   * Die Maus befindet sich in der Nähe des
-   * ursprünglichen Startpunktes.
+   * Zuerst prüfen wir, ob die letzte Wand
+   * rechtwinklig auf die erste Wand treffen kann.
+   *
+   * Wichtig:
+   * Es wird nur der seitliche Abstand der Maus
+   * zur ersten Wand geprüft. Die richtige Höhe
+   * beziehungsweise Breite ergibt sich automatisch
+   * aus dem letzten gesetzten Punkt.
    */
-  const startDistance =
-    Math.hypot(
-      mousePoint.x - firstPoint.x,
-      mousePoint.y - firstPoint.y
-    );
-
-  if (
-    startDistance <=
-    CLOSE_SNAP_DISTANCE
-  ) {
-    return {
-      type: 'start-point',
-
-      targetPoint: {
-        x: firstPoint.x,
-        y: firstPoint.y
-      },
-
-      previewPoints:
-        getOrthogonalClosingPoints(
-          points
-        )
-    };
-  }
 
   /*
-   * Möglichkeit 2:
-   * Die erste Wand ist senkrecht.
-   *
-   * Dann kann eine waagerechte Abschlusswand
-   * auf diese erste Wand treffen.
+   * Erste Wand ist senkrecht.
    */
   if (
     firstPoint.x === secondPoint.x
@@ -2349,39 +2326,37 @@ function getClosingInfo(points, mousePoint) {
       intersectionPoint.y >= minY &&
       intersectionPoint.y <= maxY;
 
-    const mouseDistance =
-      Math.hypot(
+    const distanceToFirstWall =
+      Math.abs(
         mousePoint.x -
-          intersectionPoint.x,
-
-        mousePoint.y -
-          intersectionPoint.y
+        firstPoint.x
       );
 
     if (
       intersectionIsOnWall &&
-      mouseDistance <=
+      distanceToFirstWall <=
         CLOSE_SNAP_DISTANCE
     ) {
       return {
         type: 'first-wall',
 
-        targetPoint:
-          intersectionPoint,
+        targetPoint: {
+          x: intersectionPoint.x,
+          y: intersectionPoint.y
+        },
 
         previewPoints: [
-          intersectionPoint
+          {
+            x: intersectionPoint.x,
+            y: intersectionPoint.y
+          }
         ]
       };
     }
   }
 
   /*
-   * Möglichkeit 3:
-   * Die erste Wand ist waagerecht.
-   *
-   * Dann kann eine senkrechte Abschlusswand
-   * auf diese erste Wand treffen.
+   * Erste Wand ist waagerecht.
    */
   if (
     firstPoint.y === secondPoint.y
@@ -2407,31 +2382,62 @@ function getClosingInfo(points, mousePoint) {
       intersectionPoint.x >= minX &&
       intersectionPoint.x <= maxX;
 
-    const mouseDistance =
-      Math.hypot(
-        mousePoint.x -
-          intersectionPoint.x,
-
+    const distanceToFirstWall =
+      Math.abs(
         mousePoint.y -
-          intersectionPoint.y
+        firstPoint.y
       );
 
     if (
       intersectionIsOnWall &&
-      mouseDistance <=
+      distanceToFirstWall <=
         CLOSE_SNAP_DISTANCE
     ) {
       return {
         type: 'first-wall',
 
-        targetPoint:
-          intersectionPoint,
+        targetPoint: {
+          x: intersectionPoint.x,
+          y: intersectionPoint.y
+        },
 
         previewPoints: [
-          intersectionPoint
+          {
+            x: intersectionPoint.x,
+            y: intersectionPoint.y
+          }
         ]
       };
     }
+  }
+
+  /*
+   * Erst danach prüfen wir den normalen
+   * Abschluss am ursprünglichen Startpunkt.
+   */
+  const startDistance =
+    Math.hypot(
+      mousePoint.x - firstPoint.x,
+      mousePoint.y - firstPoint.y
+    );
+
+  if (
+    startDistance <=
+    CLOSE_SNAP_DISTANCE
+  ) {
+    return {
+      type: 'start-point',
+
+      targetPoint: {
+        x: firstPoint.x,
+        y: firstPoint.y
+      },
+
+      previewPoints:
+        getOrthogonalClosingPoints(
+          points
+        )
+    };
   }
 
   return null;
@@ -2582,10 +2588,7 @@ function renderLineDrawing(mousePoint = null) {
 
   const lastPoint =
     points[points.length - 1];
-
-  const firstPoint =
-    points[0];
-
+  
   const closingInfo =
   getClosingInfo(
     points,
@@ -2743,10 +2746,7 @@ function handleLineDrawingClick(e) {
     return true;
   }
 
-  const firstPoint =
-    lineDrawing.points[0];
-
-  const closingInfo =
+    const closingInfo =
   getClosingInfo(
     lineDrawing.points,
     mousePoint
