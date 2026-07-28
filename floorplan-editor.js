@@ -10,74 +10,108 @@
  */
 
 function openFloorplanWindow() {
-    const result = calculateTechnicalRecommendation();
+  const result = calculateTechnicalRecommendation();
 
-    const win = window.open('', 'ndfFloorplan', 'width=1400,height=900,resizable=yes,scrollbars=yes');
+  const win = window.open('', 'ndfFloorplan', 'width=1400,height=900,resizable=yes,scrollbars=yes');
 
-    if (!win) {
-        showAppModal({
-            title: 'Pop-up blockiert',
-            message: 'Bitte erlauben Sie Pop-ups für diese Seite, damit der Grundriss geöffnet werden kann.',
-            confirmText: 'OK'
-        });
-        return;
-    }
-
-    const floorData = state.floors.map((floor, floorIndex) => {
-        return {
-            name: getFloorLabel(floor, floorIndex),
-            distributor: floor.floorplanDistributor || null,
-
-            template: {
-                src: floor.floorplanTemplate?.src || '',
-                fileName: floor.floorplanTemplate?.fileName || '',
-                x: Number.isFinite(
-                    Number(floor.floorplanTemplate?.x)
-                )
-                    ? Number(floor.floorplanTemplate.x)
-                    : 40,
-
-                y: Number.isFinite(
-                    Number(floor.floorplanTemplate?.y)
-                )
-                    ? Number(floor.floorplanTemplate.y)
-                    : 40,
-                scale: Number(floor.floorplanTemplate?.scale) || 1,
-                opacity:
-                    floor.floorplanTemplate?.opacity !== undefined
-                        ? Number(floor.floorplanTemplate.opacity)
-                        : 0.55,
-                locked: Boolean(floor.floorplanTemplate?.locked),
-                pixelsPerMeter:
-                    Number(floor.floorplanTemplate?.pixelsPerMeter) || null
-            },
-
-            rooms: floor.rooms.map((room, roomIndex) => {
-                const technicalRoom = result.rooms.find(r =>
-                    r.floor === getFloorLabel(floor, floorIndex) &&
-                    r.room === getRoomLabel(room, roomIndex)
-                );
-
-                return {
-                    name: getRoomLabel(room, roomIndex),
-                    function: room.function,
-                    area: Number(room.area) || 0,
-                    spacing: room.spacing,
-                    circuits: technicalRoom?.circuits || 0,
-                    pipeLength: technicalRoom?.pipeLength || 0,
-                    floorplan: room.floorplan || {}
-                };
-            })
-        };
+  if (!win) {
+    showAppModal({
+      title: 'Pop-up blockiert',
+      message: 'Bitte erlauben Sie Pop-ups für diese Seite, damit der Grundriss geöffnet werden kann.',
+      confirmText: 'OK'
     });
+    return;
+  }
 
-    win.document.open();
-    win.document.write(`
+  const floorData = state.floors.map((floor, floorIndex) => {
+    return {
+      name: getFloorLabel(floor, floorIndex),
+      distributor: floor.floorplanDistributor || null,
+
+      template: {
+        src: floor.floorplanTemplate?.src || '',
+        fileName: floor.floorplanTemplate?.fileName || '',
+        x: Number.isFinite(
+          Number(floor.floorplanTemplate?.x)
+        )
+          ? Number(floor.floorplanTemplate.x)
+          : 40,
+
+        y: Number.isFinite(
+          Number(floor.floorplanTemplate?.y)
+        )
+          ? Number(floor.floorplanTemplate.y)
+          : 40,
+        scale: Number(floor.floorplanTemplate?.scale) || 1,
+        opacity:
+          floor.floorplanTemplate?.opacity !== undefined
+            ? Number(floor.floorplanTemplate.opacity)
+            : 0.55,
+        locked: Boolean(floor.floorplanTemplate?.locked),
+        pixelsPerMeter:
+          Number(
+            floor.floorplanTemplate?.pixelsPerMeter
+          ) || null,
+
+        detectedWalls: Array.isArray(
+          floor.floorplanTemplate?.detectedWalls
+        )
+          ? floor.floorplanTemplate.detectedWalls
+          : []
+      },
+
+      rooms: floor.rooms.map((room, roomIndex) => {
+        const technicalRoom = result.rooms.find(r =>
+          r.floor === getFloorLabel(floor, floorIndex) &&
+          r.room === getRoomLabel(room, roomIndex)
+        );
+
+        return {
+          name: getRoomLabel(room, roomIndex),
+          function: room.function,
+          area: Number(room.area) || 0,
+          spacing: room.spacing,
+          circuits: technicalRoom?.circuits || 0,
+          pipeLength: technicalRoom?.pipeLength || 0,
+          floorplan: room.floorplan || {}
+        };
+      })
+    };
+  });
+
+  win.document.open();
+  win.document.write(`
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <title>Grundriss - Fußbodenheizung</title>
+
+<script>
+  window.openCvReady = false;
+
+  function onOpenCvReady() {
+    window.openCvReady = true;
+
+    const status =
+      document.getElementById(
+        'wallDetectionStatus'
+      );
+
+    if (status) {
+      status.textContent =
+        'Bilderkennung ist bereit.';
+    }
+  }
+</script>
+
+<script
+  async
+  src="https://docs.opencv.org/4.x/opencv.js"
+  onload="onOpenCvReady()"
+  type="text/javascript"
+></script>
+
 <style>
   body {
     margin: 0;
@@ -797,6 +831,71 @@ function openFloorplanWindow() {
   pointer-events: none;
 }
 
+.wall-detection-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.detected-wall-line {
+  stroke: #2563eb;
+  stroke-width: 3;
+  stroke-dasharray: 10 6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.detected-wall-line.horizontal {
+  stroke: #2563eb;
+}
+
+.detected-wall-line.vertical {
+  stroke: #7c3aed;
+}
+
+.wall-detection-status {
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.wall-detection-status.warning {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
+.wall-detection-status.success {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.wall-detection-controls {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid #d7d7d7;
+}
+
+.wall-detection-controls h4 {
+  margin: 0;
+  color: #0b2a4a;
+}
+
+.wall-detection-button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .room {
   z-index: 10;
 }
@@ -1467,7 +1566,7 @@ function renderTemplate() {
 
  if (!template.src) {
   return;
-}
+ }
 
   const layer = document.createElement('div');
 
@@ -1491,6 +1590,14 @@ function renderTemplate() {
 
   layer.appendChild(image);
 
+  image.addEventListener('load', () => {
+  renderDetectedWallOverlay(
+    layer,
+    image,
+    template
+  );
+ });
+
   if (!template.locked) {
     layer.addEventListener(
       'mousedown',
@@ -1499,6 +1606,551 @@ function renderTemplate() {
   }
 
   workspace.appendChild(layer);
+}
+
+function renderDetectedWallOverlay(
+  layer,
+  image,
+  template
+) {
+  layer
+    .querySelector(
+      '.wall-detection-overlay'
+    )
+    ?.remove();
+
+  const walls =
+    Array.isArray(template.detectedWalls)
+      ? template.detectedWalls
+      : [];
+
+  if (!walls.length) {
+    return;
+  }
+
+  const imageWidth =
+    image.naturalWidth;
+
+  const imageHeight =
+    image.naturalHeight;
+
+  if (
+    !imageWidth ||
+    !imageHeight
+  ) {
+    return;
+  }
+
+  const svg =
+    document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'svg'
+    );
+
+  svg.classList.add(
+    'wall-detection-overlay'
+  );
+
+  svg.setAttribute(
+    'width',
+    imageWidth
+  );
+
+  svg.setAttribute(
+    'height',
+    imageHeight
+  );
+
+  svg.setAttribute(
+    'viewBox',
+    '0 0 ' +
+      imageWidth +
+      ' ' +
+      imageHeight
+  );
+
+  walls.forEach((wall) => {
+    const line =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'line'
+      );
+
+    line.setAttribute(
+      'x1',
+      wall.x1
+    );
+
+    line.setAttribute(
+      'y1',
+      wall.y1
+    );
+
+    line.setAttribute(
+      'x2',
+      wall.x2
+    );
+
+    line.setAttribute(
+      'y2',
+      wall.y2
+    );
+
+    line.setAttribute(
+      'class',
+      'detected-wall-line ' +
+        wall.orientation
+    );
+
+    svg.appendChild(line);
+  });
+
+  layer.appendChild(svg);
+}
+
+function isOpenCvAvailable() {
+  return Boolean(
+    window.openCvReady &&
+    window.cv &&
+    typeof window.cv.Mat === 'function'
+  );
+}
+
+function getDetectedLineLength(line) {
+  return Math.hypot(
+    line.x2 - line.x1,
+    line.y2 - line.y1
+  );
+}
+
+function normalizeDetectedLine(line) {
+  if (
+    line.orientation === 'horizontal' &&
+    line.x1 > line.x2
+  ) {
+    return {
+      ...line,
+      x1: line.x2,
+      x2: line.x1
+    };
+  }
+
+  if (
+    line.orientation === 'vertical' &&
+    line.y1 > line.y2
+  ) {
+    return {
+      ...line,
+      y1: line.y2,
+      y2: line.y1
+    };
+  }
+
+  return line;
+}
+
+function mergeDetectedLines(lines) {
+  const normalized =
+    lines
+      .map(normalizeDetectedLine)
+      .sort((lineA, lineB) => {
+        if (
+          lineA.orientation !==
+          lineB.orientation
+        ) {
+          return lineA.orientation.localeCompare(
+            lineB.orientation
+          );
+        }
+
+        if (
+          lineA.orientation ===
+          'horizontal'
+        ) {
+          return (
+            lineA.y1 - lineB.y1 ||
+            lineA.x1 - lineB.x1
+          );
+        }
+
+        return (
+          lineA.x1 - lineB.x1 ||
+          lineA.y1 - lineB.y1
+        );
+      });
+
+  const merged = [];
+
+  normalized.forEach((line) => {
+    const existing =
+      merged.find((candidate) => {
+        if (
+          candidate.orientation !==
+          line.orientation
+        ) {
+          return false;
+        }
+
+        if (
+          line.orientation ===
+          'horizontal'
+        ) {
+          const sameAxis =
+            Math.abs(
+              candidate.y1 - line.y1
+            ) <= 8;
+
+          const overlapping =
+            line.x1 <=
+              candidate.x2 + 18 &&
+            line.x2 >=
+              candidate.x1 - 18;
+
+          return (
+            sameAxis &&
+            overlapping
+          );
+        }
+
+        const sameAxis =
+          Math.abs(
+            candidate.x1 - line.x1
+          ) <= 8;
+
+        const overlapping =
+          line.y1 <=
+            candidate.y2 + 18 &&
+          line.y2 >=
+            candidate.y1 - 18;
+
+        return (
+          sameAxis &&
+          overlapping
+        );
+      });
+
+    if (!existing) {
+      merged.push({
+        ...line
+      });
+
+      return;
+    }
+
+    if (
+      line.orientation ===
+      'horizontal'
+    ) {
+      existing.x1 =
+        Math.min(
+          existing.x1,
+          line.x1
+        );
+
+      existing.x2 =
+        Math.max(
+          existing.x2,
+          line.x2
+        );
+
+      existing.y1 =
+        existing.y2 =
+          Math.round(
+            (
+              existing.y1 +
+              line.y1
+            ) / 2
+          );
+    } else {
+      existing.y1 =
+        Math.min(
+          existing.y1,
+          line.y1
+        );
+
+      existing.y2 =
+        Math.max(
+          existing.y2,
+          line.y2
+        );
+
+      existing.x1 =
+        existing.x2 =
+          Math.round(
+            (
+              existing.x1 +
+              line.x1
+            ) / 2
+          );
+    }
+  });
+
+  return merged.filter(
+    (line) =>
+      getDetectedLineLength(line) >= 35
+  );
+}
+
+async function detectWallsFromTemplate() {
+  const template =
+    getActiveTemplate();
+
+  if (!template.src) {
+    alert(
+      'Bitte laden Sie zuerst eine Grundrissvorlage hoch.'
+    );
+
+    return;
+  }
+
+  if (!isOpenCvAvailable()) {
+    alert(
+      'Die Bilderkennung wird noch geladen. Bitte versuchen Sie es in einigen Sekunden erneut.'
+    );
+
+    return;
+  }
+
+  const button =
+    document.getElementById(
+      'detectWallsBtn'
+    );
+
+  const status =
+    document.getElementById(
+      'wallDetectionStatus'
+    );
+
+  if (button) {
+    button.disabled = true;
+    button.textContent =
+      'Erkennung läuft …';
+  }
+
+  if (status) {
+    status.className =
+      'wall-detection-status';
+
+    status.textContent =
+      'Vorlage wird analysiert …';
+  }
+
+  const image =
+    new Image();
+
+  image.onload = () => {
+    let src = null;
+    let gray = null;
+    let blurred = null;
+    let edges = null;
+    let lines = null;
+
+    try {
+      src =
+        cv.imread(image);
+
+      gray =
+        new cv.Mat();
+
+      blurred =
+        new cv.Mat();
+
+      edges =
+        new cv.Mat();
+
+      lines =
+        new cv.Mat();
+
+      /*
+       * Bild in Graustufen umwandeln.
+       */
+      cv.cvtColor(
+        src,
+        gray,
+        cv.COLOR_RGBA2GRAY
+      );
+
+      /*
+       * Kleine JPEG-Artefakte und Texte etwas
+       * glätten.
+       */
+      cv.GaussianBlur(
+        gray,
+        blurred,
+        new cv.Size(5, 5),
+        0,
+        0,
+        cv.BORDER_DEFAULT
+      );
+
+      /*
+       * Kanten bestimmen.
+       */
+      cv.Canny(
+        blurred,
+        edges,
+        60,
+        160,
+        3,
+        false
+      );
+
+      /*
+       * Gerade Liniensegmente erkennen.
+       */
+      cv.HoughLinesP(
+        edges,
+        lines,
+        1,
+        Math.PI / 180,
+        45,
+        35,
+        16
+      );
+
+      const detectedLines = [];
+
+      for (
+        let index = 0;
+        index < lines.rows;
+        index++
+      ) {
+        const offset =
+          index * 4;
+
+        const x1 =
+          lines.data32S[
+            offset
+          ];
+
+        const y1 =
+          lines.data32S[
+            offset + 1
+          ];
+
+        const x2 =
+          lines.data32S[
+            offset + 2
+          ];
+
+        const y2 =
+          lines.data32S[
+            offset + 3
+          ];
+
+        const deltaX =
+          Math.abs(x2 - x1);
+
+        const deltaY =
+          Math.abs(y2 - y1);
+
+        /*
+         * Nur annähernd waagerechte oder
+         * senkrechte Linien übernehmen.
+         */
+        if (
+          deltaY <=
+          Math.max(4, deltaX * 0.08)
+        ) {
+          const y =
+            Math.round(
+              (y1 + y2) / 2
+            );
+
+          detectedLines.push({
+            x1,
+            y1: y,
+            x2,
+            y2: y,
+            orientation:
+              'horizontal'
+          });
+
+          continue;
+        }
+
+        if (
+          deltaX <=
+          Math.max(4, deltaY * 0.08)
+        ) {
+          const x =
+            Math.round(
+              (x1 + x2) / 2
+            );
+
+          detectedLines.push({
+            x1: x,
+            y1,
+            x2: x,
+            y2,
+            orientation:
+              'vertical'
+          });
+        }
+      }
+
+      template.detectedWalls =
+        mergeDetectedLines(
+          detectedLines
+        );
+
+      if (status) {
+        status.className =
+          'wall-detection-status success';
+
+        status.textContent =
+          template.detectedWalls.length +
+          ' mögliche Wandlinien erkannt.';
+      }
+
+      renderFloor();
+    } catch (error) {
+      console.error(
+        'Fehler bei der Wanderkennung:',
+        error
+      );
+
+      alert(
+        'Die Vorlage konnte nicht analysiert werden.'
+      );
+    } finally {
+      src?.delete();
+      gray?.delete();
+      blurred?.delete();
+      edges?.delete();
+      lines?.delete();
+
+      if (button) {
+        button.disabled = false;
+        button.textContent =
+          'Wände erkennen';
+      }
+    }
+  };
+
+  image.onerror = () => {
+    alert(
+      'Die Grundrissvorlage konnte für die Bilderkennung nicht geladen werden.'
+    );
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        'Wände erkennen';
+    }
+  };
+
+  image.src =
+    template.src;
+}
+
+function clearDetectedWalls() {
+  const template =
+    getActiveTemplate();
+
+  template.detectedWalls = [];
+
+  renderFloor();
 }
 
 function openTemplateFileDialog() {
@@ -1548,6 +2200,7 @@ function handleTemplateUpload(event) {
     template.opacity = 0.55;
     template.locked = false;
     template.pixelsPerMeter = null;
+    template.detectedWalls = [];
 
     calibration.active = false;
     calibration.points = [];
@@ -3939,15 +4592,55 @@ function renderTemplateControls() {
       '</div>' +
 
       '<div class="template-button-row">' +
-        '<button id="resetTemplatePositionBtn" type="button">' +
-          'Position zurücksetzen' +
-        '</button>' +
+  '<button id="resetTemplatePositionBtn" type="button">' +
+    'Position zurücksetzen' +
+  '</button>' +
 
-        '<button id="removeTemplateBtn" type="button">' +
-          'Vorlage entfernen' +
-        '</button>' +
-      '</div>' +
-    '</div>';
+  '<button id="removeTemplateBtn" type="button">' +
+    'Vorlage entfernen' +
+  '</button>' +
+'</div>' +
+
+'<div class="wall-detection-controls">' +
+  '<h4>Halbautomatische Erkennung</h4>' +
+
+  '<div ' +
+    'id="wallDetectionStatus" ' +
+    'class="wall-detection-status' +
+      (
+        window.openCvReady
+          ? ''
+          : ' warning'
+      ) +
+    '"' +
+  '>' +
+    (
+      window.openCvReady
+        ? (
+            Array.isArray(
+              template.detectedWalls
+            ) &&
+            template.detectedWalls.length
+              ? template.detectedWalls.length +
+                ' mögliche Wandlinien vorhanden.'
+              : 'Bilderkennung ist bereit.'
+          )
+        : 'Bilderkennung wird geladen …'
+    ) +
+  '</div>' +
+
+  '<div class="wall-detection-button-row">' +
+    '<button id="detectWallsBtn" type="button">' +
+      'Wände erkennen' +
+    '</button>' +
+
+    '<button id="clearDetectedWallsBtn" type="button">' +
+      'Vorschau löschen' +
+    '</button>' +
+  '</div>' +
+'</div>' +
+
+'</div>';
 
   document
     .getElementById('templateScale')
@@ -3975,6 +4668,22 @@ function renderTemplateControls() {
   document
     .getElementById('removeTemplateBtn')
     .addEventListener('click', removeTemplate);
+
+    document
+  .getElementById('detectWallsBtn')
+  ?.addEventListener(
+    'click',
+    detectWallsFromTemplate
+  );
+
+document
+  .getElementById(
+    'clearDetectedWallsBtn'
+  )
+  ?.addEventListener(
+    'click',
+    clearDetectedWalls
+  );
 }
 
 function handleTemplateScale(e) {
@@ -4088,7 +4797,8 @@ function removeTemplate() {
     scale: 1,
     opacity: 0.55,
     locked: false,
-    pixelsPerMeter: null
+    pixelsPerMeter: null,
+    detectedWalls: []
   };
 
   calibration.active = false;
@@ -4402,5 +5112,5 @@ document.addEventListener(
 </body>
 </html>
   `);
-    win.document.close();
+  win.document.close();
 }
