@@ -352,6 +352,37 @@ function openFloorplanWindow() {
   cursor: crosshair;
 }
 
+/*
+ * Während des Zeichnens sind alle bereits vorhandenen
+ * Grundrisselemente für Mausereignisse vollständig gesperrt.
+ * Klicks gelangen dadurch zum Workspace.
+ */
+.workspace.draw-mode .room,
+.workspace.draw-mode .room *,
+.workspace.draw-mode .distributor-marker,
+.workspace.draw-mode .template-layer {
+  pointer-events: none !important;
+  cursor: crosshair !important;
+}
+
+/*
+ * Auch Polygonflächen dürfen im Zeichenmodus
+ * keine Klicks oder Mauszeiger übernehmen.
+ */
+.workspace.draw-mode .polygon-room-shape {
+  pointer-events: none !important;
+  cursor: crosshair !important;
+}
+
+/*
+ * Die gerade aktive Wand-Zeichenebene bleibt sichtbar,
+ * ihre Ereignisse werden weiterhin über den Workspace
+ * verarbeitet.
+ */
+.workspace.draw-mode .wall-drawing-layer {
+  pointer-events: none;
+}
+
 .draw-preview {
   position: absolute;
   border: 3px dashed #0066cc;
@@ -1132,7 +1163,7 @@ function setMode(newMode) {
 
   if (mode === 'draw-lines') {
   createModeCursorLabel(
-    'Startpunkt setzen – danach weitere Punkte anklicken - Endpunkt = Starpunkt'
+    'Startpunkt setzen – danach weitere Punkte anklicken – Endpunkt = Startpunkt'
   );
   }
 }
@@ -1640,24 +1671,37 @@ if (!isPolygon) {
 
  div.addEventListener('mousedown', startDrag);
  div.addEventListener('click', (e) => {
-  if (e.target.classList.contains('resize-handle')) return;
-
- if (mode === 'door') {
-  e.stopPropagation();
-
-  if (isPolygon) {
-    alert(
-      'Türen an frei gezeichneten Raumkonturen werden im nächsten Erweiterungsschritt einzelnen Wandabschnitten zugeordnet.'
-    );
+  if (
+    mode === 'draw-rect' ||
+    mode === 'draw-lines'
+  ) {
     return;
   }
 
-  openDoorDialog(roomIndex);
-  return;
-}
+  if (
+    e.target.classList.contains(
+      'resize-handle'
+    )
+  ) {
+    return;
+  }
+
+  if (mode === 'door') {
+    e.stopPropagation();
+
+    if (isPolygon) {
+      alert(
+        'Türen an frei gezeichneten Raumkonturen werden im nächsten Erweiterungsschritt einzelnen Wandabschnitten zugeordnet.'
+      );
+      return;
+    }
+
+    openDoorDialog(roomIndex);
+    return;
+  }
 
   selectRoom(roomIndex);
- });
+});
 
     workspace.appendChild(div);
   });
@@ -1929,7 +1973,15 @@ function addFloorFromPlan() {
 }
 
 function startDrag(e) {
-if (mode !== 'move') return;
+  if (mode !== 'move') {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+
   const roomEl = e.currentTarget;
   const roomIndex = Number(roomEl.dataset.roomIndex);
   const room = floorData[activeFloorIndex].rooms[roomIndex];
@@ -1971,9 +2023,12 @@ function stopDrag() {
 }
 
 function startResize(e) {
-if (mode !== 'move') return;
-  e.stopPropagation();
-
+ if (mode !== 'move') {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+  
   const roomEl = e.currentTarget.closest('.room');
   const roomIndex = Number(roomEl.dataset.roomIndex);
   const room = floorData[activeFloorIndex].rooms[roomIndex];
@@ -2262,11 +2317,8 @@ function handleLineDrawingClick(e) {
   const workspace =
     document.getElementById('workspace');
 
-  if (
-    e.target !== workspace &&
-    e.target.id !== 'wallDrawingLayer'
-  ) {
-    return false;
+  if (!workspace.contains(e.target)) {
+  return false;
   }
 
   e.preventDefault();
@@ -2278,7 +2330,7 @@ function handleLineDrawingClick(e) {
   if (lineDrawing.points.length === 0) {
     lineDrawing.points.push(mousePoint);
 
-removeModeCursorLabel();
+  removeModeCursorLabel();
 
     renderLineDrawing();
 
@@ -2753,22 +2805,30 @@ const shape =
 
 function startDraw(e) {
   if (mode !== 'draw-rect') return;
-  if (e.target !== document.getElementById('workspace')) return;
+  
+  const workspace =
+    document.getElementById('workspace');
 
-  const workspace = document.getElementById('workspace');
+  if (!workspace.contains(e.target)) {
+  return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+
   const rect = workspace.getBoundingClientRect();
 
   const startX = e.clientX - rect.left + workspace.scrollLeft;
   const startY = e.clientY - rect.top + workspace.scrollTop;
 
-const preview = document.createElement('div');
-preview.className = 'draw-preview';
-preview.style.left = startX + 'px';
-preview.style.top = startY + 'px';
-preview.style.width = '0px';
-preview.style.height = '0px';
+  const preview = document.createElement('div');
+  preview.className = 'draw-preview';
+  preview.style.left = startX + 'px';
+  preview.style.top = startY + 'px';
+  preview.style.width = '0px';
+  preview.style.height = '0px';
 
-preview.innerHTML =
+  preview.innerHTML =
   '<div class="dimension-cross draw-dimension-cross">' +
     '<div class="dim-line dim-horizontal"></div>' +
     '<div class="dim-line dim-vertical"></div>' +
@@ -2777,7 +2837,7 @@ preview.innerHTML =
   '</div>' +
   '<div class="draw-area-live">0,00 m²</div>';
 
-workspace.appendChild(preview);
+  workspace.appendChild(preview);
 
   draw = {
     startX,
