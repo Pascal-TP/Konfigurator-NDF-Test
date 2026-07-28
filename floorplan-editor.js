@@ -856,6 +856,97 @@ function openFloorplanWindow() {
   stroke: #7c3aed;
 }
 
+/*
+ * Im normalen Zustand bleibt die Vorschau
+ * vollständig durchklickbar.
+ */
+.wall-detection-overlay {
+  pointer-events: none;
+}
+
+/*
+ * Während der Bearbeitung darf das Overlay
+ * Mausereignisse empfangen.
+ */
+.template-layer.wall-edit-active {
+  pointer-events: auto !important;
+  cursor: default !important;
+}
+
+.template-layer.wall-edit-active
+.wall-detection-overlay {
+  pointer-events: auto;
+}
+
+/*
+ * Die sichtbare Linie selbst soll nicht allein
+ * für die Trefferfläche zuständig sein.
+ */
+.detected-wall-line {
+  pointer-events: none;
+}
+
+/*
+ * Unsichtbare, breitere Trefferlinie.
+ */
+.detected-wall-hitbox {
+  stroke: transparent;
+  stroke-width: 16;
+  fill: none;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/*
+ * Markierte Wandlinie.
+ */
+.detected-wall-line.selected {
+  stroke: #dc2626 !important;
+  stroke-width: 6;
+  stroke-dasharray: none;
+}
+
+/*
+ * Manuell ergänzte Wandlinie.
+ */
+.detected-wall-line.manual {
+  stroke: #059669;
+}
+
+/*
+ * Vorschau beim Ergänzen einer Linie.
+ */
+.manual-wall-preview {
+  stroke: #f59e0b;
+  stroke-width: 4;
+  stroke-dasharray: 8 6;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.manual-wall-start-point {
+  fill: #f59e0b;
+  stroke: #ffffff;
+  stroke-width: 3;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.template-layer.wall-add-active {
+  cursor: crosshair !important;
+}
+
+.wall-edit-button.active {
+  background: #dcfce7;
+  color: #166534;
+  border: 2px solid #22c55e;
+}
+
+.wall-delete-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .wall-detection-status {
   padding: 9px 10px;
   border-radius: 9px;
@@ -1144,6 +1235,14 @@ let modeCursorLabel = null;
 let distributorGhost = null;
 let distributorDrag = null;
 let templateDrag = null;
+
+let wallEditMode = 'none';
+let selectedDetectedWallId = null;
+
+let manualWallDrawing = {
+  startPoint: null,
+  previewPoint: null
+};
 
 let calibration = {
   active: false,
@@ -1572,8 +1671,22 @@ function renderTemplate() {
 
   layer.id = 'templateLayer';
   layer.className =
-    'template-layer ' +
-    (template.locked ? 'locked' : 'unlocked');
+  'template-layer ' +
+  (
+    template.locked
+      ? 'locked'
+      : 'unlocked'
+  ) +
+  (
+    wallEditMode !== 'none'
+      ? ' wall-edit-active'
+      : ''
+  ) +
+  (
+    wallEditMode === 'add'
+      ? ' wall-add-active'
+      : ''
+  );
 
   layer.style.left = template.x + 'px';
   layer.style.top = template.y + 'px';
@@ -1608,11 +1721,46 @@ function renderTemplate() {
   workspace.appendChild(layer);
 }
 
+function ensureDetectedWallIds(template) {
+  if (
+    !Array.isArray(
+      template.detectedWalls
+    )
+  ) {
+    template.detectedWalls = [];
+    return;
+  }
+
+  template.detectedWalls =
+    template.detectedWalls.map(
+      (wall, index) => {
+        return {
+          ...wall,
+
+          id:
+            wall.id ||
+            (
+              'wall-existing-' +
+              Date.now() +
+              '-' +
+              index
+            ),
+
+          source:
+            wall.source ||
+            'detected'
+        };
+      }
+    );
+}
+
 function renderDetectedWallOverlay(
   layer,
   image,
   template
 ) {
+  ensureDetectedWallIds(template);
+
   layer
     .querySelector(
       '.wall-detection-overlay'
@@ -1620,13 +1768,11 @@ function renderDetectedWallOverlay(
     ?.remove();
 
   const walls =
-    Array.isArray(template.detectedWalls)
+    Array.isArray(
+      template.detectedWalls
+    )
       ? template.detectedWalls
       : [];
-
-  if (!walls.length) {
-    return;
-  }
 
   const imageWidth =
     image.naturalWidth;
@@ -1637,6 +1783,17 @@ function renderDetectedWallOverlay(
   if (
     !imageWidth ||
     !imageHeight
+  ) {
+    return;
+  }
+
+  /*
+   * Auch ohne Linien wird im Ergänzungsmodus
+   * ein Overlay benötigt.
+   */
+  if (
+    !walls.length &&
+    wallEditMode === 'none'
   ) {
     return;
   }
@@ -1670,6 +1827,18 @@ function renderDetectedWallOverlay(
   );
 
   walls.forEach((wall) => {
+    const group =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'g'
+      );
+
+    group.dataset.wallId =
+      wall.id;
+
+    /*
+     * Sichtbare Linie.
+     */
     const line =
       document.createElementNS(
         'http://www.w3.org/2000/svg',
@@ -1696,16 +1865,648 @@ function renderDetectedWallOverlay(
       wall.y2
     );
 
+    const lineClasses = [
+      'detected-wall-line',
+      wall.orientation
+    ];
+
+    if (
+      wall.source === 'manual'
+    ) {
+      lineClasses.push('manual');
+    }
+
+    if (
+      wall.id ===
+      selectedDetectedWallId
+    ) {
+      lineClasses.push('selected');
+    }
+
     line.setAttribute(
       'class',
-      'detected-wall-line ' +
-        wall.orientation
+      lineClasses.join(' ')
     );
 
-    svg.appendChild(line);
+    /*
+     * Unsichtbare, breite Trefferfläche.
+     */
+    const hitbox =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'line'
+      );
+
+    hitbox.setAttribute(
+      'x1',
+      wall.x1
+    );
+
+    hitbox.setAttribute(
+      'y1',
+      wall.y1
+    );
+
+    hitbox.setAttribute(
+      'x2',
+      wall.x2
+    );
+
+    hitbox.setAttribute(
+      'y2',
+      wall.y2
+    );
+
+    hitbox.setAttribute(
+      'class',
+      'detected-wall-hitbox'
+    );
+
+    hitbox.dataset.wallId =
+      wall.id;
+
+    hitbox.addEventListener(
+      'click',
+      (event) => {
+        if (
+          wallEditMode !==
+          'select'
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        selectDetectedWall(
+          wall.id
+        );
+      }
+    );
+
+    group.appendChild(line);
+    group.appendChild(hitbox);
+
+    svg.appendChild(group);
   });
 
+  /*
+   * Startpunkt und Vorschau einer neuen Linie.
+   */
+  if (
+    wallEditMode === 'add' &&
+    manualWallDrawing.startPoint
+  ) {
+    const startPoint =
+      manualWallDrawing.startPoint;
+
+    const startCircle =
+      document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'circle'
+      );
+
+    startCircle.setAttribute(
+      'cx',
+      startPoint.x
+    );
+
+    startCircle.setAttribute(
+      'cy',
+      startPoint.y
+    );
+
+    startCircle.setAttribute(
+      'r',
+      7
+    );
+
+    startCircle.setAttribute(
+      'class',
+      'manual-wall-start-point'
+    );
+
+    svg.appendChild(startCircle);
+
+    if (
+      manualWallDrawing.previewPoint
+    ) {
+      const previewPoint =
+        manualWallDrawing.previewPoint;
+
+      const previewLine =
+        document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'line'
+        );
+
+      previewLine.setAttribute(
+        'x1',
+        startPoint.x
+      );
+
+      previewLine.setAttribute(
+        'y1',
+        startPoint.y
+      );
+
+      previewLine.setAttribute(
+        'x2',
+        previewPoint.x
+      );
+
+      previewLine.setAttribute(
+        'y2',
+        previewPoint.y
+      );
+
+      previewLine.setAttribute(
+        'class',
+        'manual-wall-preview'
+      );
+
+      svg.appendChild(
+        previewLine
+      );
+    }
+  }
+
+  svg.addEventListener(
+    'click',
+    handleDetectedWallOverlayClick
+  );
+
+  svg.addEventListener(
+    'mousemove',
+    handleDetectedWallOverlayMove
+  );
+
+  svg.addEventListener(
+    'mouseleave',
+    handleDetectedWallOverlayLeave
+  );
+
   layer.appendChild(svg);
+}
+
+function getTemplateImagePoint(event) {
+  const image =
+    document.querySelector(
+      '#templateLayer .template-image'
+    );
+
+  if (!image) {
+    return null;
+  }
+
+  const rect =
+    image.getBoundingClientRect();
+
+  if (
+    !rect.width ||
+    !rect.height ||
+    !image.naturalWidth ||
+    !image.naturalHeight
+  ) {
+    return null;
+  }
+
+  const rawX =
+    (
+      event.clientX -
+      rect.left
+    ) *
+    (
+      image.naturalWidth /
+      rect.width
+    );
+
+  const rawY =
+    (
+      event.clientY -
+      rect.top
+    ) *
+    (
+      image.naturalHeight /
+      rect.height
+    );
+
+  /*
+   * Der vorhandene Fangschalter wird auch
+   * für ergänzte Erkennungslinien verwendet.
+   */
+  const grid =
+    snapEnabled
+      ? SNAP_GRID_SIZE
+      : 1;
+
+  const x =
+    snapEnabled
+      ? Math.round(rawX / grid) * grid
+      : Math.round(rawX * 10) / 10;
+
+  const y =
+    snapEnabled
+      ? Math.round(rawY / grid) * grid
+      : Math.round(rawY * 10) / 10;
+
+  return {
+    x: Math.max(
+      0,
+      Math.min(
+        image.naturalWidth,
+        x
+      )
+    ),
+
+    y: Math.max(
+      0,
+      Math.min(
+        image.naturalHeight,
+        y
+      )
+    )
+  };
+}
+
+function getOrthogonalManualWallPoint(
+  startPoint,
+  mousePoint
+) {
+  const deltaX =
+    Math.abs(
+      mousePoint.x -
+      startPoint.x
+    );
+
+  const deltaY =
+    Math.abs(
+      mousePoint.y -
+      startPoint.y
+    );
+
+  if (deltaX >= deltaY) {
+    return {
+      x: mousePoint.x,
+      y: startPoint.y
+    };
+  }
+
+  return {
+    x: startPoint.x,
+    y: mousePoint.y
+  };
+}
+
+function createDetectedWallId() {
+  return (
+    'wall-manual-' +
+    Date.now() +
+    '-' +
+    Math.random()
+      .toString(36)
+      .slice(2, 8)
+  );
+}
+
+function selectDetectedWall(wallId) {
+  if (
+    wallEditMode !== 'select'
+  ) {
+    return;
+  }
+
+  selectedDetectedWallId =
+    selectedDetectedWallId === wallId
+      ? null
+      : wallId;
+
+  refreshDetectedWallOverlay();
+  renderTemplateControls();
+}
+
+function deleteSelectedDetectedWall() {
+  if (
+    !selectedDetectedWallId
+  ) {
+    return false;
+  }
+
+  const template =
+    getActiveTemplate();
+
+  const previousLength =
+    template.detectedWalls.length;
+
+  template.detectedWalls =
+    template.detectedWalls.filter(
+      (wall) =>
+        wall.id !==
+        selectedDetectedWallId
+    );
+
+  const deleted =
+    template.detectedWalls.length <
+    previousLength;
+
+  selectedDetectedWallId = null;
+
+  if (deleted) {
+    saveTemplateToMainWindow();
+    refreshDetectedWallOverlay();
+    renderTemplateControls();
+  }
+
+  return deleted;
+}
+
+function startDetectedWallEditing() {
+  const template =
+    getActiveTemplate();
+
+  if (
+    !Array.isArray(
+      template.detectedWalls
+    ) ||
+    !template.detectedWalls.length
+  ) {
+    alert(
+      'Es sind noch keine erkannten Linien vorhanden.'
+    );
+
+    return;
+  }
+
+  /*
+   * Andere Editor-Modi verlassen.
+   */
+  setMode('move');
+
+  wallEditMode = 'select';
+  selectedDetectedWallId = null;
+
+  manualWallDrawing = {
+    startPoint: null,
+    previewPoint: null
+  };
+
+  applyDetectedWallEditState();
+  renderTemplateControls();
+}
+
+function startManualWallAdding() {
+  const template =
+    getActiveTemplate();
+
+  if (!template.src) {
+    alert(
+      'Bitte laden Sie zuerst eine Grundrissvorlage hoch.'
+    );
+
+    return;
+  }
+
+  setMode('move');
+
+  wallEditMode = 'add';
+  selectedDetectedWallId = null;
+
+  manualWallDrawing = {
+    startPoint: null,
+    previewPoint: null
+  };
+
+  applyDetectedWallEditState();
+  renderTemplateControls();
+}
+
+function finishDetectedWallEditing() {
+  wallEditMode = 'none';
+  selectedDetectedWallId = null;
+
+  manualWallDrawing = {
+    startPoint: null,
+    previewPoint: null
+  };
+
+  applyDetectedWallEditState();
+  renderTemplateControls();
+}
+
+function applyDetectedWallEditState() {
+  const layer =
+    document.getElementById(
+      'templateLayer'
+    );
+
+  if (!layer) {
+    return;
+  }
+
+  const isActive =
+    wallEditMode !== 'none';
+
+  layer.classList.toggle(
+    'wall-edit-active',
+    isActive
+  );
+
+  layer.classList.toggle(
+    'wall-add-active',
+    wallEditMode === 'add'
+  );
+
+  refreshDetectedWallOverlay();
+}
+
+function refreshDetectedWallOverlay() {
+  const layer =
+    document.getElementById(
+      'templateLayer'
+    );
+
+  const image =
+    layer?.querySelector(
+      '.template-image'
+    );
+
+  if (
+    !layer ||
+    !image
+  ) {
+    return;
+  }
+
+  renderDetectedWallOverlay(
+    layer,
+    image,
+    getActiveTemplate()
+  );
+
+  layer.classList.toggle(
+    'wall-edit-active',
+    wallEditMode !== 'none'
+  );
+
+  layer.classList.toggle(
+    'wall-add-active',
+    wallEditMode === 'add'
+  );
+}
+
+function handleDetectedWallOverlayClick(
+  event
+) {
+  if (
+    wallEditMode !== 'add'
+  ) {
+    return;
+  }
+
+  /*
+   * Klick auf eine Trefferlinie soll im
+   * Ergänzungsmodus ebenfalls als normaler
+   * Punkt gelten.
+   */
+  event.preventDefault();
+  event.stopPropagation();
+
+  const point =
+    getTemplateImagePoint(event);
+
+  if (!point) {
+    return;
+  }
+
+  /*
+   * Erster Klick: Startpunkt setzen.
+   */
+  if (
+    !manualWallDrawing.startPoint
+  ) {
+    manualWallDrawing.startPoint =
+      point;
+
+    manualWallDrawing.previewPoint =
+      point;
+
+    refreshDetectedWallOverlay();
+    return;
+  }
+
+  /*
+   * Zweiter Klick: rechtwinkligen Endpunkt
+   * ermitteln und Linie speichern.
+   */
+  const startPoint =
+    manualWallDrawing.startPoint;
+
+  const endPoint =
+    getOrthogonalManualWallPoint(
+      startPoint,
+      point
+    );
+
+  const length =
+    Math.hypot(
+      endPoint.x -
+        startPoint.x,
+
+      endPoint.y -
+        startPoint.y
+    );
+
+  if (length < 10) {
+    alert(
+      'Die ergänzte Linie ist zu kurz.'
+    );
+
+    return;
+  }
+
+  const orientation =
+    startPoint.y === endPoint.y
+      ? 'horizontal'
+      : 'vertical';
+
+  const newWall =
+    normalizeDetectedLine({
+      id:
+        createDetectedWallId(),
+
+      x1:
+        startPoint.x,
+
+      y1:
+        startPoint.y,
+
+      x2:
+        endPoint.x,
+
+      y2:
+        endPoint.y,
+
+      orientation,
+
+      source: 'manual'
+    });
+
+  const template =
+    getActiveTemplate();
+
+  template.detectedWalls.push(
+    newWall
+  );
+
+  saveTemplateToMainWindow();
+
+  manualWallDrawing = {
+    startPoint: null,
+    previewPoint: null
+  };
+
+  refreshDetectedWallOverlay();
+  renderTemplateControls();
+}
+
+function handleDetectedWallOverlayMove(
+  event
+) {
+  if (
+    wallEditMode !== 'add' ||
+    !manualWallDrawing.startPoint
+  ) {
+    return;
+  }
+
+  const mousePoint =
+    getTemplateImagePoint(event);
+
+  if (!mousePoint) {
+    return;
+  }
+
+  manualWallDrawing.previewPoint =
+    getOrthogonalManualWallPoint(
+      manualWallDrawing.startPoint,
+      mousePoint
+    );
+
+  refreshDetectedWallOverlay();
+}
+
+function handleDetectedWallOverlayLeave() {
+  if (
+    wallEditMode !== 'add' ||
+    !manualWallDrawing.startPoint
+  ) {
+    return;
+  }
+
+  manualWallDrawing.previewPoint =
+    null;
+
+  refreshDetectedWallOverlay();
 }
 
 function isOpenCvAvailable() {
@@ -2090,9 +2891,24 @@ async function detectWallsFromTemplate() {
       }
 
       template.detectedWalls =
-        mergeDetectedLines(
-          detectedLines
-        );
+  mergeDetectedLines(
+    detectedLines
+  ).map((wall, index) => ({
+    ...wall,
+
+    id:
+      'wall-' +
+      Date.now() +
+      '-' +
+      index,
+
+    source: 'detected'
+  }));
+
+  selectedDetectedWallId = null;
+wallEditMode = 'none';
+
+saveTemplateToMainWindow();
 
       if (status) {
         status.className =
@@ -2148,8 +2964,35 @@ function clearDetectedWalls() {
   const template =
     getActiveTemplate();
 
+  if (
+    !Array.isArray(
+      template.detectedWalls
+    ) ||
+    !template.detectedWalls.length
+  ) {
+    return;
+  }
+
+  const confirmed =
+    confirm(
+      'Möchten Sie wirklich alle erkannten und manuell ergänzten Linien löschen?'
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
   template.detectedWalls = [];
 
+  selectedDetectedWallId = null;
+  wallEditMode = 'none';
+
+  manualWallDrawing = {
+    startPoint: null,
+    previewPoint: null
+  };
+
+  saveTemplateToMainWindow();
   renderFloor();
 }
 
@@ -4360,6 +5203,7 @@ if (
   if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') return;
 
   deleteSelectedRoom();
+  
 });
 
 function getActiveFloor() {
@@ -4378,7 +5222,8 @@ function getActiveTemplate() {
       scale: 1,
       opacity: 0.55,
       locked: false,
-      pixelsPerMeter: null
+      pixelsPerMeter: null,
+      detectedWalls: []
     };
   }
 
@@ -4440,6 +5285,7 @@ function startTemplateDrag(e) {
 
   if (template.locked) return;
   if (mode !== 'move') return;
+  if (wallEditMode !== 'none') return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -4526,6 +5372,28 @@ function renderTemplateControls() {
 
   const calibrated =
     Number(template.pixelsPerMeter) > 0;
+
+    const detectedWallCount =
+  Array.isArray(
+    template.detectedWalls
+  )
+    ? template.detectedWalls.length
+    : 0;
+
+const wallEditStatus =
+  wallEditMode === 'select'
+    ? (
+        selectedDetectedWallId
+          ? 'Linie ausgewählt. Mit Entf oder dem Löschbutton entfernen.'
+          : 'Klicken Sie eine Linie an, um sie auszuwählen.'
+      )
+    : wallEditMode === 'add'
+      ? (
+          manualWallDrawing.startPoint
+            ? 'Klicken Sie den Endpunkt der neuen Linie an.'
+            : 'Klicken Sie den Startpunkt der neuen Linie an.'
+        )
+      : '';
 
   container.innerHTML =
     '<div class="template-controls">' +
@@ -4621,8 +5489,15 @@ function renderTemplateControls() {
               template.detectedWalls
             ) &&
             template.detectedWalls.length
-              ? template.detectedWalls.length +
-                ' mögliche Wandlinien vorhanden.'
+              ? detectedWallCount +
+' Wandlinien vorhanden.' +
+(
+  wallEditStatus
+    ? '<br><strong>' +
+      wallEditStatus +
+      '</strong>'
+    : ''
+)
               : 'Bilderkennung ist bereit.'
           )
         : 'Bilderkennung wird geladen …'
@@ -4630,14 +5505,71 @@ function renderTemplateControls() {
   '</div>' +
 
   '<div class="wall-detection-button-row">' +
-    '<button id="detectWallsBtn" type="button">' +
-      'Wände erkennen' +
-    '</button>' +
+  '<button id="detectWallsBtn" type="button">' +
+    'Wände erkennen' +
+  '</button>' +
 
-    '<button id="clearDetectedWallsBtn" type="button">' +
-      'Vorschau löschen' +
-    '</button>' +
-  '</div>' +
+  '<button id="clearDetectedWallsBtn" type="button">' +
+    'Alle Linien löschen' +
+  '</button>' +
+'</div>' +
+
+'<div class="wall-detection-button-row">' +
+  '<button ' +
+    'id="editDetectedWallsBtn" ' +
+    'type="button" ' +
+    'class="wall-edit-button ' +
+      (
+        wallEditMode === 'select'
+          ? 'active'
+          : ''
+      ) +
+    '"' +
+  '>' +
+    'Linien bearbeiten' +
+  '</button>' +
+
+  '<button ' +
+    'id="addDetectedWallBtn" ' +
+    'type="button" ' +
+    'class="wall-edit-button ' +
+      (
+        wallEditMode === 'add'
+          ? 'active'
+          : ''
+      ) +
+    '"' +
+  '>' +
+    'Linie ergänzen' +
+  '</button>' +
+'</div>' +
+
+'<div class="wall-detection-button-row">' +
+  '<button ' +
+    'id="deleteDetectedWallBtn" ' +
+    'type="button" ' +
+    'class="wall-delete-button" ' +
+    (
+      selectedDetectedWallId
+        ? ''
+        : 'disabled '
+    ) +
+  '>' +
+    'Ausgewählte löschen' +
+  '</button>' +
+
+  '<button ' +
+    'id="finishWallEditingBtn" ' +
+    'type="button" ' +
+    (
+      wallEditMode === 'none'
+        ? 'disabled'
+        : ''
+    ) +
+  '>' +
+    'Bearbeitung beenden' +
+  '</button>' +
+'</div>' +
 '</div>' +
 
 '</div>';
@@ -4683,6 +5615,42 @@ document
   ?.addEventListener(
     'click',
     clearDetectedWalls
+  );
+
+  document
+  .getElementById(
+    'editDetectedWallsBtn'
+  )
+  ?.addEventListener(
+    'click',
+    startDetectedWallEditing
+  );
+
+document
+  .getElementById(
+    'addDetectedWallBtn'
+  )
+  ?.addEventListener(
+    'click',
+    startManualWallAdding
+  );
+
+document
+  .getElementById(
+    'deleteDetectedWallBtn'
+  )
+  ?.addEventListener(
+    'click',
+    deleteSelectedDetectedWall
+  );
+
+document
+  .getElementById(
+    'finishWallEditingBtn'
+  )
+  ?.addEventListener(
+    'click',
+    finishDetectedWallEditing
   );
 }
 
@@ -5092,8 +6060,54 @@ document.addEventListener(
       return;
     }
 
-    e.preventDefault();
-    deleteSelectedRoom();
+    /*
+ * Im Linienbearbeitungsmodus hat die
+ * ausgewählte Erkennungslinie Vorrang.
+ */
+if (
+  wallEditMode === 'select' &&
+  selectedDetectedWallId
+) {
+  e.preventDefault();
+
+  deleteSelectedDetectedWall();
+  return;
+}
+
+e.preventDefault();
+deleteSelectedRoom();
+  }
+);
+
+document.addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    if (
+      wallEditMode === 'add' &&
+      manualWallDrawing.startPoint
+    ) {
+      event.preventDefault();
+
+      manualWallDrawing = {
+        startPoint: null,
+        previewPoint: null
+      };
+
+      refreshDetectedWallOverlay();
+      renderTemplateControls();
+      return;
+    }
+
+    if (
+      wallEditMode !== 'none'
+    ) {
+      event.preventDefault();
+      finishDetectedWallEditing();
+    }
   }
 );
 
