@@ -6547,7 +6547,7 @@ function removeTemplate() {
 
   const floor = getActiveFloor();
 
-  floor.template = {
+  ffloor.template = {
     src: '',
     fileName: '',
     x: 40,
@@ -6558,18 +6558,18 @@ function removeTemplate() {
     pixelsPerMeter: null,
     detectedWalls: [],
     detectionArea: null
-
-    detectionAreaSelection = {
-  active: false,
-  dragging: false,
-  startPoint: null,
-  currentPoint: null,
-  pointerId: null
 };
-  };
 
-  calibration.active = false;
-  calibration.points = [];
+detectionAreaSelection = {
+    active: false,
+    dragging: false,
+    startPoint: null,
+    currentPoint: null,
+    pointerId: null
+};
+
+calibration.active = false;
+calibration.points = [];
 
   saveTemplateToMainWindow();
   renderFloor();
