@@ -57,7 +57,38 @@ function openFloorplanWindow() {
           floor.floorplanTemplate?.detectedWalls
         )
           ? floor.floorplanTemplate.detectedWalls
-          : []
+          : [],
+
+        detectionArea:
+          floor.floorplanTemplate?.detectionArea &&
+            Number.isFinite(
+              Number(
+                floor.floorplanTemplate
+                  .detectionArea.x
+              )
+            )
+            ? {
+              x: Number(
+                floor.floorplanTemplate
+                  .detectionArea.x
+              ),
+
+              y: Number(
+                floor.floorplanTemplate
+                  .detectionArea.y
+              ),
+
+              width: Number(
+                floor.floorplanTemplate
+                  .detectionArea.width
+              ),
+
+              height: Number(
+                floor.floorplanTemplate
+                  .detectionArea.height
+              )
+            }
+            : null
       },
 
       rooms: floor.rooms.map((room, roomIndex) => {
@@ -1050,6 +1081,58 @@ function openFloorplanWindow() {
   color: #9a3412;
 }
 
+
+/*
+ * Auswahlmodus für den Erkennungsbereich.
+ */
+.template-layer.detection-area-active {
+  pointer-events: auto !important;
+  cursor: crosshair !important;
+}
+
+.template-layer.detection-area-active
+.wall-detection-overlay {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+/*
+ * Gespeicherter Erkennungsbereich.
+ */
+.detection-area-rectangle {
+  fill: rgba(34, 197, 94, 0.10);
+  stroke: #16a34a;
+  stroke-width: 4;
+  stroke-dasharray: 12 7;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/*
+ * Während des Aufziehens wird der Bereich
+ * etwas deutlicher angezeigt.
+ */
+.detection-area-rectangle.drawing {
+  fill: rgba(37, 99, 235, 0.14);
+  stroke: #2563eb;
+  stroke-dasharray: 8 5;
+}
+
+/*
+ * Kleine Beschriftung oberhalb des Bereichs.
+ */
+.detection-area-label {
+  fill: #166534;
+  font-size: 16px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+
 .calibration-point {
   position: absolute;
   width: 14px;
@@ -1242,6 +1325,14 @@ let selectedDetectedWallId = null;
 let manualWallDrawing = {
   startPoint: null,
   previewPoint: null
+};
+
+let detectionAreaSelection = {
+  active: false,
+  dragging: false,
+  startPoint: null,
+  currentPoint: null,
+  pointerId: null
 };
 
 let calibration = {
@@ -1686,6 +1777,11 @@ function renderTemplate() {
     wallEditMode === 'add'
       ? ' wall-add-active'
       : ''
+       ) +
+  (
+    detectionAreaSelection.active
+      ? ' detection-area-active'
+      : ''
   );
 
   layer.style.left = template.x + 'px';
@@ -1754,6 +1850,134 @@ function ensureDetectedWallIds(template) {
     );
 }
 
+function normalizeDetectionArea(
+  startPoint,
+  endPoint
+) {
+  if (
+    !startPoint ||
+    !endPoint
+  ) {
+    return null;
+  }
+
+  const x =
+    Math.min(
+      startPoint.x,
+      endPoint.x
+    );
+
+  const y =
+    Math.min(
+      startPoint.y,
+      endPoint.y
+    );
+
+  const width =
+    Math.abs(
+      endPoint.x -
+      startPoint.x
+    );
+
+  const height =
+    Math.abs(
+      endPoint.y -
+      startPoint.y
+    );
+
+  return {
+    x,
+    y,
+    width,
+    height
+  };
+}
+
+function getValidDetectionArea(
+  template,
+  imageWidth,
+  imageHeight
+) {
+  const area =
+    template?.detectionArea;
+
+  if (
+    !area ||
+    !Number.isFinite(
+      Number(area.x)
+    ) ||
+    !Number.isFinite(
+      Number(area.y)
+    ) ||
+    !Number.isFinite(
+      Number(area.width)
+    ) ||
+    !Number.isFinite(
+      Number(area.height)
+    )
+  ) {
+    return null;
+  }
+
+  const x =
+    Math.max(
+      0,
+      Math.min(
+        imageWidth - 1,
+        Math.round(
+          Number(area.x)
+        )
+      )
+    );
+
+  const y =
+    Math.max(
+      0,
+      Math.min(
+        imageHeight - 1,
+        Math.round(
+          Number(area.y)
+        )
+      )
+    );
+
+  const width =
+    Math.max(
+      1,
+      Math.min(
+        imageWidth - x,
+        Math.round(
+          Number(area.width)
+        )
+      )
+    );
+
+  const height =
+    Math.max(
+      1,
+      Math.min(
+        imageHeight - y,
+        Math.round(
+          Number(area.height)
+        )
+      )
+    );
+
+  if (
+    width < 20 ||
+    height < 20
+  ) {
+    return null;
+  }
+
+  return {
+    x,
+    y,
+    width,
+    height
+  };
+}
+
 function renderDetectedWallOverlay(
   layer,
   image,
@@ -1791,12 +2015,19 @@ function renderDetectedWallOverlay(
    * Auch ohne Linien wird im Ergänzungsmodus
    * ein Overlay benötigt.
    */
-  if (
-    !walls.length &&
-    wallEditMode === 'none'
-  ) {
-    return;
-  }
+  const hasDetectionArea =
+  Boolean(
+    template.detectionArea
+  );
+
+if (
+  !walls.length &&
+  wallEditMode === 'none' &&
+  !detectionAreaSelection.active &&
+  !hasDetectionArea
+) {
+  return;
+}
 
   const svg =
     document.createElementNS(
@@ -1825,6 +2056,102 @@ function renderDetectedWallOverlay(
       ' ' +
       imageHeight
   );
+
+  /*
+ * Gespeicherten oder gerade aufgezogenen
+ * Erkennungsbereich bestimmen.
+ */
+let displayedDetectionArea =
+  template.detectionArea;
+
+if (
+  detectionAreaSelection.active &&
+  detectionAreaSelection.startPoint &&
+  detectionAreaSelection.currentPoint
+) {
+  displayedDetectionArea =
+    normalizeDetectionArea(
+      detectionAreaSelection.startPoint,
+      detectionAreaSelection.currentPoint
+    );
+}
+
+if (displayedDetectionArea) {
+  const selectionRectangle =
+    document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'rect'
+    );
+
+  selectionRectangle.setAttribute(
+    'id',
+    'detectionAreaRectangle'
+  );
+
+  selectionRectangle.setAttribute(
+    'x',
+    displayedDetectionArea.x
+  );
+
+  selectionRectangle.setAttribute(
+    'y',
+    displayedDetectionArea.y
+  );
+
+  selectionRectangle.setAttribute(
+    'width',
+    displayedDetectionArea.width
+  );
+
+  selectionRectangle.setAttribute(
+    'height',
+    displayedDetectionArea.height
+  );
+
+  selectionRectangle.setAttribute(
+    'class',
+    'detection-area-rectangle' +
+      (
+        detectionAreaSelection
+          .dragging
+          ? ' drawing'
+          : ''
+      )
+  );
+
+  svg.appendChild(
+    selectionRectangle
+  );
+
+  const label =
+    document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'text'
+    );
+
+  label.setAttribute(
+    'x',
+    displayedDetectionArea.x + 8
+  );
+
+  label.setAttribute(
+    'y',
+    Math.max(
+      20,
+      displayedDetectionArea.y - 8
+    )
+  );
+
+  label.setAttribute(
+    'class',
+    'detection-area-label'
+  );
+
+  label.textContent =
+    'Erkennungsbereich';
+
+  svg.appendChild(label);
+}
 
   walls.forEach((wall) => {
     const group =
@@ -2046,7 +2373,305 @@ function renderDetectedWallOverlay(
     handleDetectedWallOverlayLeave
   );
 
+  svg.addEventListener(
+  'pointerdown',
+  handleDetectionAreaPointerDown
+);
+
+svg.addEventListener(
+  'pointermove',
+  handleDetectionAreaPointerMove
+);
+
+svg.addEventListener(
+  'pointerup',
+  handleDetectionAreaPointerUp
+);
+
+svg.addEventListener(
+  'pointercancel',
+  cancelDetectionAreaDrag
+);
+
   layer.appendChild(svg);
+}
+
+function startDetectionAreaSelection() {
+  const template =
+    getActiveTemplate();
+
+  if (!template.src) {
+    alert(
+      'Bitte laden Sie zuerst eine Grundrissvorlage hoch.'
+    );
+
+    return;
+  }
+
+  /*
+   * Andere Bearbeitungsmodi verlassen.
+   */
+  finishDetectedWallEditing();
+  setMode('move');
+
+  detectionAreaSelection = {
+    active: true,
+    dragging: false,
+    startPoint: null,
+    currentPoint: null,
+    pointerId: null
+  };
+
+  selectedDetectedWallId = null;
+
+  applyDetectionAreaSelectionState();
+  renderTemplateControls();
+}
+
+function applyDetectionAreaSelectionState() {
+  const layer =
+    document.getElementById(
+      'templateLayer'
+    );
+
+  if (!layer) {
+    return;
+  }
+
+  layer.classList.toggle(
+    'detection-area-active',
+    detectionAreaSelection.active
+  );
+
+  refreshDetectedWallOverlay();
+}
+
+function handleDetectionAreaPointerDown(
+  event
+) {
+  if (
+    !detectionAreaSelection.active
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const point =
+    getTemplateImagePoint(event);
+
+  if (!point) {
+    return;
+  }
+
+  detectionAreaSelection.dragging =
+    true;
+
+  detectionAreaSelection.startPoint =
+    point;
+
+  detectionAreaSelection.currentPoint =
+    point;
+
+  detectionAreaSelection.pointerId =
+    event.pointerId;
+
+  event.currentTarget
+    .setPointerCapture?.(
+      event.pointerId
+    );
+
+  updateDetectionAreaPreview();
+}
+
+function handleDetectionAreaPointerMove(
+  event
+) {
+  if (
+    !detectionAreaSelection.active ||
+    !detectionAreaSelection.dragging
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const point =
+    getTemplateImagePoint(event);
+
+  if (!point) {
+    return;
+  }
+
+  detectionAreaSelection.currentPoint =
+    point;
+
+  updateDetectionAreaPreview();
+}
+
+function handleDetectionAreaPointerUp(
+  event
+) {
+  if (
+    !detectionAreaSelection.active ||
+    !detectionAreaSelection.dragging
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const point =
+    getTemplateImagePoint(event);
+
+  if (point) {
+    detectionAreaSelection.currentPoint =
+      point;
+  }
+
+  const area =
+    normalizeDetectionArea(
+      detectionAreaSelection.startPoint,
+      detectionAreaSelection.currentPoint
+    );
+
+  detectionAreaSelection.dragging =
+    false;
+
+  if (
+    !area ||
+    area.width < 20 ||
+    area.height < 20
+  ) {
+    alert(
+      'Der ausgewählte Bereich ist zu klein. Bitte ziehen Sie einen größeren Bereich auf.'
+    );
+
+    detectionAreaSelection.startPoint =
+      null;
+
+    detectionAreaSelection.currentPoint =
+      null;
+
+    refreshDetectedWallOverlay();
+    return;
+  }
+
+  const template =
+    getActiveTemplate();
+
+  template.detectionArea = {
+    x: Math.round(area.x),
+    y: Math.round(area.y),
+    width:
+      Math.round(area.width),
+    height:
+      Math.round(area.height)
+  };
+
+  detectionAreaSelection = {
+    active: false,
+    dragging: false,
+    startPoint: null,
+    currentPoint: null,
+    pointerId: null
+  };
+
+  saveTemplateToMainWindow();
+  renderFloor();
+}
+
+function cancelDetectionAreaDrag() {
+  if (
+    !detectionAreaSelection.active
+  ) {
+    return;
+  }
+
+  detectionAreaSelection.dragging =
+    false;
+
+  detectionAreaSelection.startPoint =
+    null;
+
+  detectionAreaSelection.currentPoint =
+    null;
+
+  refreshDetectedWallOverlay();
+}
+
+function updateDetectionAreaPreview() {
+  const rectangle =
+    document.getElementById(
+      'detectionAreaRectangle'
+    );
+
+  const area =
+    normalizeDetectionArea(
+      detectionAreaSelection.startPoint,
+      detectionAreaSelection.currentPoint
+    );
+
+  /*
+   * Falls das Rechteck noch nicht vorhanden ist,
+   * wird das Overlay einmal neu aufgebaut.
+   */
+  if (
+    !rectangle ||
+    !area
+  ) {
+    refreshDetectedWallOverlay();
+    return;
+  }
+
+  rectangle.setAttribute(
+    'x',
+    area.x
+  );
+
+  rectangle.setAttribute(
+    'y',
+    area.y
+  );
+
+  rectangle.setAttribute(
+    'width',
+    area.width
+  );
+
+  rectangle.setAttribute(
+    'height',
+    area.height
+  );
+
+  rectangle.classList.add(
+    'drawing'
+  );
+}
+
+function clearDetectionArea() {
+  const template =
+    getActiveTemplate();
+
+  if (!template.detectionArea) {
+    return;
+  }
+
+  template.detectionArea = null;
+
+  detectionAreaSelection = {
+    active: false,
+    dragging: false,
+    startPoint: null,
+    currentPoint: null,
+    pointerId: null
+  };
+
+  saveTemplateToMainWindow();
+  renderFloor();
 }
 
 function getTemplateImagePoint(event) {
@@ -2741,14 +3366,51 @@ async function detectWallsFromTemplate() {
 
   image.onload = () => {
     let src = null;
-    let gray = null;
-    let blurred = null;
-    let edges = null;
-    let lines = null;
+let analysisSource = null;
+let croppedSource = null;
+let gray = null;
+let blurred = null;
+let edges = null;
+let lines = null;
 
     try {
       src =
         cv.imread(image);
+
+const detectionArea =
+  getValidDetectionArea(
+    template,
+    image.naturalWidth,
+    image.naturalHeight
+  );
+
+let detectionOffsetX = 0;
+let detectionOffsetY = 0;
+
+if (detectionArea) {
+  const cropRectangle =
+    new cv.Rect(
+      detectionArea.x,
+      detectionArea.y,
+      detectionArea.width,
+      detectionArea.height
+    );
+
+  croppedSource =
+    src.roi(cropRectangle);
+
+  analysisSource =
+    croppedSource;
+
+  detectionOffsetX =
+    detectionArea.x;
+
+  detectionOffsetY =
+    detectionArea.y;
+} else {
+  analysisSource =
+    src;
+}
 
       gray =
         new cv.Mat();
@@ -2766,9 +3428,9 @@ async function detectWallsFromTemplate() {
        * Bild in Graustufen umwandeln.
        */
       cv.cvtColor(
-        src,
-        gray,
-        cv.COLOR_RGBA2GRAY
+       analysisSource,
+       gray,
+       cv.COLOR_RGBA2GRAY
       );
 
       /*
@@ -2858,14 +3520,26 @@ async function detectWallsFromTemplate() {
               (y1 + y2) / 2
             );
 
-          detectedLines.push({
-            x1,
-            y1: y,
-            x2,
-            y2: y,
-            orientation:
-              'horizontal'
-          });
+         detectedLines.push({
+  x1:
+    x1 +
+    detectionOffsetX,
+
+  y1:
+    y +
+    detectionOffsetY,
+
+  x2:
+    x2 +
+    detectionOffsetX,
+
+  y2:
+    y +
+    detectionOffsetY,
+
+  orientation:
+    'horizontal'
+});
 
           continue;
         }
@@ -2879,14 +3553,26 @@ async function detectWallsFromTemplate() {
               (x1 + x2) / 2
             );
 
-          detectedLines.push({
-            x1: x,
-            y1,
-            x2: x,
-            y2,
-            orientation:
-              'vertical'
-          });
+         detectedLines.push({
+  x1:
+    x +
+    detectionOffsetX,
+
+  y1:
+    y1 +
+    detectionOffsetY,
+
+  x2:
+    x +
+    detectionOffsetX,
+
+  y2:
+    y2 +
+    detectionOffsetY,
+
+  orientation:
+    'vertical'
+});
         }
       }
 
@@ -2915,8 +3601,13 @@ saveTemplateToMainWindow();
           'wall-detection-status success';
 
         status.textContent =
-          template.detectedWalls.length +
-          ' mögliche Wandlinien erkannt.';
+  template.detectedWalls.length +
+  ' mögliche Wandlinien erkannt' +
+  (
+    template.detectionArea
+      ? ' – nur im ausgewählten Bereich.'
+      : ' – im vollständigen Bild.'
+  );
       }
 
       renderFloor();
@@ -2930,6 +3621,7 @@ saveTemplateToMainWindow();
         'Die Vorlage konnte nicht analysiert werden.'
       );
     } finally {
+      croppedSource?.delete();
       src?.delete();
       gray?.delete();
       blurred?.delete();
@@ -3044,6 +3736,15 @@ function handleTemplateUpload(event) {
     template.locked = false;
     template.pixelsPerMeter = null;
     template.detectedWalls = [];
+    template.detectionArea = null;
+
+detectionAreaSelection = {
+  active: false,
+  dragging: false,
+  startPoint: null,
+  currentPoint: null,
+  pointerId: null
+};
 
     calibration.active = false;
     calibration.points = [];
@@ -5223,7 +5924,8 @@ function getActiveTemplate() {
       opacity: 0.55,
       locked: false,
       pixelsPerMeter: null,
-      detectedWalls: []
+      detectedWalls: [],
+      detectionArea: null
     };
   }
 
@@ -5286,6 +5988,11 @@ function startTemplateDrag(e) {
   if (template.locked) return;
   if (mode !== 'move') return;
   if (wallEditMode !== 'none') return;
+  if (
+  detectionAreaSelection.active
+) {
+  return;
+}
 
   e.preventDefault();
   e.stopPropagation();
@@ -5395,6 +6102,23 @@ const wallEditStatus =
         )
       : '';
 
+const detectionAreaStatus =
+  detectionAreaSelection.active
+    ? 'Ziehen Sie mit gedrückter Maustaste den gewünschten Analysebereich auf.'
+    : template.detectionArea
+      ? (
+          'Erkennungsbereich: ' +
+          Math.round(
+            template.detectionArea.width
+          ) +
+          ' × ' +
+          Math.round(
+            template.detectionArea.height
+          ) +
+          ' Bildpixel.'
+        )
+      : 'Kein Erkennungsbereich gewählt. Das vollständige Bild wird analysiert.';
+
   container.innerHTML =
     '<div class="template-controls">' +
       '<h3>Grundrissvorlage</h3>' +
@@ -5467,9 +6191,9 @@ const wallEditStatus =
   '<button id="removeTemplateBtn" type="button">' +
     'Vorlage entfernen' +
   '</button>' +
-'</div>' +
+ '</div>' +
 
-'<div class="wall-detection-controls">' +
+ '<div class="wall-detection-controls">' +
   '<h4>Halbautomatische Erkennung</h4>' +
 
   '<div ' +
@@ -5484,27 +6208,74 @@ const wallEditStatus =
   '>' +
     (
       window.openCvReady
+  ? (
+      detectedWallCount > 0
         ? (
-            Array.isArray(
-              template.detectedWalls
-            ) &&
-            template.detectedWalls.length
-              ? detectedWallCount +
-' Wandlinien vorhanden.' +
-(
-  wallEditStatus
-    ? '<br><strong>' +
-      wallEditStatus +
-      '</strong>'
-    : ''
-)
-              : 'Bilderkennung ist bereit.'
+            detectedWallCount +
+            ' Wandlinien vorhanden.' +
+            '<br>' +
+            detectionAreaStatus +
+            (
+              wallEditStatus
+                ? '<br><strong>' +
+                  wallEditStatus +
+                  '</strong>'
+                : ''
+            )
           )
-        : 'Bilderkennung wird geladen …'
+        : (
+            'Bilderkennung ist bereit.' +
+            '<br>' +
+            detectionAreaStatus +
+            (
+              wallEditStatus
+                ? '<br><strong>' +
+                  wallEditStatus +
+                  '</strong>'
+                : ''
+            )
+          )
+    )
+  : 'Bilderkennung wird geladen …'
     ) +
   '</div>' +
 
   '<div class="wall-detection-button-row">' +
+
+  '<button ' +
+    'id="selectDetectionAreaBtn" ' +
+    'type="button" ' +
+    'class="wall-edit-button ' +
+      (
+        detectionAreaSelection.active
+          ? 'active'
+          : ''
+      ) +
+    '"' +
+  '>' +
+    (
+      template.detectionArea
+        ? 'Bereich neu wählen'
+        : 'Bereich auswählen'
+    ) +
+  '</button>' +
+
+  '<button ' +
+    'id="clearDetectionAreaBtn" ' +
+    'type="button" ' +
+    (
+      template.detectionArea
+        ? ''
+        : 'disabled'
+    ) +
+  '>' +
+    'Bereich löschen' +
+  '</button>' +
+
+'</div>' +
+
+'<div class="wall-detection-button-row">' +
+
   '<button id="detectWallsBtn" type="button">' +
     'Wände erkennen' +
   '</button>' +
@@ -5512,9 +6283,10 @@ const wallEditStatus =
   '<button id="clearDetectedWallsBtn" type="button">' +
     'Alle Linien löschen' +
   '</button>' +
+
 '</div>' +
 
-'<div class="wall-detection-button-row">' +
+ '<div class="wall-detection-button-row">' +
   '<button ' +
     'id="editDetectedWallsBtn" ' +
     'type="button" ' +
@@ -5542,9 +6314,9 @@ const wallEditStatus =
   '>' +
     'Linie ergänzen' +
   '</button>' +
-'</div>' +
+ '</div>' +
 
-'<div class="wall-detection-button-row">' +
+ '<div class="wall-detection-button-row">' +
   '<button ' +
     'id="deleteDetectedWallBtn" ' +
     'type="button" ' +
@@ -5651,6 +6423,24 @@ document
   ?.addEventListener(
     'click',
     finishDetectedWallEditing
+  );
+
+  document
+  .getElementById(
+    'selectDetectionAreaBtn'
+  )
+  ?.addEventListener(
+    'click',
+    startDetectionAreaSelection
+  );
+
+document
+  .getElementById(
+    'clearDetectionAreaBtn'
+  )
+  ?.addEventListener(
+    'click',
+    clearDetectionArea
   );
 }
 
@@ -5766,7 +6556,16 @@ function removeTemplate() {
     opacity: 0.55,
     locked: false,
     pixelsPerMeter: null,
-    detectedWalls: []
+    detectedWalls: [],
+    detectionArea: null
+
+    detectionAreaSelection = {
+  active: false,
+  dragging: false,
+  startPoint: null,
+  currentPoint: null,
+  pointerId: null
+};
   };
 
   calibration.active = false;
@@ -6085,6 +6884,24 @@ document.addEventListener(
     if (event.key !== 'Escape') {
       return;
     }
+
+if (
+  detectionAreaSelection.active
+) {
+  event.preventDefault();
+
+  detectionAreaSelection = {
+    active: false,
+    dragging: false,
+    startPoint: null,
+    currentPoint: null,
+    pointerId: null
+  };
+
+  applyDetectionAreaSelectionState();
+  renderTemplateControls();
+  return;
+}
 
     if (
       wallEditMode === 'add' &&
