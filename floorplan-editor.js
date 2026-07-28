@@ -2288,6 +2288,31 @@ function getClosingInfo(points, mousePoint) {
   const lastPoint =
     points[points.length - 1];
 
+    const startDistance =
+  Math.hypot(
+    mousePoint.x - firstPoint.x,
+    mousePoint.y - firstPoint.y
+  );
+
+if (
+  startDistance <=
+  CLOSE_SNAP_DISTANCE
+) {
+  return {
+    type: 'start-point',
+
+    targetPoint: {
+      x: firstPoint.x,
+      y: firstPoint.y
+    },
+
+    previewPoints:
+      getOrthogonalClosingPoints(
+        points
+      )
+  };
+}
+
   /*
    * Zuerst prüfen wir, ob die letzte Wand
    * rechtwinklig auf die erste Wand treffen kann.
@@ -2303,8 +2328,9 @@ function getClosingInfo(points, mousePoint) {
    * Erste Wand ist senkrecht.
    */
   if (
-    firstPoint.x === secondPoint.x
-  ) {
+  points.length >= 4 &&
+  firstPoint.x === secondPoint.x
+) {
     const minY =
       Math.min(
         firstPoint.y,
@@ -2359,8 +2385,9 @@ function getClosingInfo(points, mousePoint) {
    * Erste Wand ist waagerecht.
    */
   if (
-    firstPoint.y === secondPoint.y
-  ) {
+  points.length >= 4 &&
+  firstPoint.y === secondPoint.y
+) {
     const minX =
       Math.min(
         firstPoint.x,
@@ -2409,35 +2436,6 @@ function getClosingInfo(points, mousePoint) {
         ]
       };
     }
-  }
-
-  /*
-   * Erst danach prüfen wir den normalen
-   * Abschluss am ursprünglichen Startpunkt.
-   */
-  const startDistance =
-    Math.hypot(
-      mousePoint.x - firstPoint.x,
-      mousePoint.y - firstPoint.y
-    );
-
-  if (
-    startDistance <=
-    CLOSE_SNAP_DISTANCE
-  ) {
-    return {
-      type: 'start-point',
-
-      targetPoint: {
-        x: firstPoint.x,
-        y: firstPoint.y
-      },
-
-      previewPoints:
-        getOrthogonalClosingPoints(
-          points
-        )
-    };
   }
 
   return null;
@@ -2818,80 +2816,6 @@ if (
 ) {
   return true;
 }
-  
-if (closingInfo) {
-  /*
-   * Sonderfall:
-   * Abschluss auf der ersten Wand.
-   *
-   * Der bisherige Startpunkt wird auf den
-   * Schnittpunkt verschoben. Dadurch wird
-   * der überstehende Teil der ersten Wand
-   * automatisch abgeschnitten.
-   */
-  if (
-    closingInfo.type ===
-    'first-wall'
-  ) {
-    lineDrawing.points[0] = {
-      x:
-        closingInfo
-          .targetPoint.x,
-
-      y:
-        closingInfo
-          .targetPoint.y
-    };
-
-    const lastStoredPoint =
-      lineDrawing.points[
-        lineDrawing.points.length - 1
-      ];
-
-    if (
-      lastStoredPoint.x !==
-        closingInfo.targetPoint.x ||
-      lastStoredPoint.y !==
-        closingInfo.targetPoint.y
-    ) {
-      lineDrawing.points.push({
-        x:
-          closingInfo
-            .targetPoint.x,
-
-        y:
-          closingInfo
-            .targetPoint.y
-      });
-    }
-  } else {
-    /*
-     * Normaler Abschluss am ursprünglichen
-     * Startpunkt.
-     */
-    closingInfo.previewPoints.forEach(
-      (point) => {
-        const lastStoredPoint =
-          lineDrawing.points[
-            lineDrawing.points.length - 1
-          ];
-
-        if (
-          lastStoredPoint.x !== point.x ||
-          lastStoredPoint.y !== point.y
-        ) {
-          lineDrawing.points.push({
-            x: point.x,
-            y: point.y
-          });
-        }
-      }
-    );
-  }
-
-  closeLineDrawing();
-  return true;
-}
 
   lineDrawing.points.push(nextPoint);
   renderLineDrawing();
@@ -3270,44 +3194,79 @@ function simplifyOrthogonalPoints(points) {
 }
 
 function closeLineDrawing() {
-  const points =
-  simplifyOrthogonalPoints(
-    lineDrawing.points
-  );
+  /*
+   * Zunächst mit einer Kopie der tatsächlich
+   * gezeichneten Punkte arbeiten.
+   */
+  const rawPoints =
+    lineDrawing.points.map((point) => ({
+      x: point.x,
+      y: point.y
+    }));
 
-  if (points.length < 3) {
+  if (rawPoints.length < 4) {
     alert(
-      'Für einen Raum werden mindestens drei Eckpunkte benötigt.'
+      'Für einen geschlossenen Raum werden mindestens drei Eckpunkte benötigt.'
     );
     return;
   }
 
-  const firstPoint = points[0];
-  const lastPoint =
-    points[points.length - 1];
+  const rawFirstPoint =
+    rawPoints[0];
+
+  const rawLastPoint =
+    rawPoints[
+      rawPoints.length - 1
+    ];
+
+  /*
+   * Vor der Vereinfachung prüfen, ob die Kontur
+   * wirklich geschlossen wurde.
+   */
+  if (
+    rawFirstPoint.x !== rawLastPoint.x ||
+    rawFirstPoint.y !== rawLastPoint.y
+  ) {
+    alert(
+      'Die Raumkontur konnte nicht vollständig geschlossen werden.'
+    );
+    return;
+  }
+
+  /*
+   * Den doppelten letzten Startpunkt entfernen.
+   * SVG-Polygone und die Flächenberechnung schließen
+   * die Kontur später automatisch.
+   */
+  rawPoints.pop();
+
+  const points =
+    simplifyOrthogonalPoints(
+      rawPoints
+    );
+
+  if (points.length < 3) {
+    alert(
+      'Die gezeichnete Raumkontur enthält zu wenige gültige Eckpunkte.'
+    );
+    return;
+  }
 
   if (
-  firstPoint.x !== lastPoint.x ||
-  firstPoint.y !== lastPoint.y
-) {
-  alert(
-    'Die Raumkontur konnte nicht vollständig geschlossen werden.'
-  );
-  return;
-}
-  
-    if (
-  polygonHasSelfIntersections(points)
-) {
-  alert(
-    'Die gezeichnete Raumkontur überschneidet sich selbst. Bitte entfernen Sie den letzten Punkt oder zeichnen Sie die betroffene Wand neu.'
-  );
+    polygonHasSelfIntersections(
+      points
+    )
+  ) {
+    alert(
+      'Die gezeichnete Raumkontur überschneidet sich selbst. Bitte entfernen Sie den letzten Punkt oder zeichnen Sie die betroffene Wand neu.'
+    );
+    return;
+  }
 
-  return;
-}
-
-const shape =
-    createPolygonShape(points);
+  const shape =
+    createPolygonShape(
+      points
+    );
 
   if (
     shape.width < 30 ||
