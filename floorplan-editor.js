@@ -841,20 +841,6 @@ function openFloorplanWindow() {
   cursor: default;
 }
 
-.template-empty-hint {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  padding: 16px 20px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px dashed #94a3b8;
-  color: #64748b;
-  z-index: 2;
-  pointer-events: none;
-}
-
 .wall-drawing-layer {
   position: absolute;
   inset: 0;
@@ -1386,14 +1372,9 @@ function renderTemplate() {
   const workspace = document.getElementById('workspace');
   const template = getActiveTemplate();
 
-  if (!template.src) {
-    const hint = document.createElement('div');
-    hint.className = 'template-empty-hint';
-    hint.textContent =
-      'Noch keine Grundrissvorlage für diese Etage hochgeladen.';
-    workspace.appendChild(hint);
-    return;
-  }
+ if (!template.src) {
+  return;
+}
 
   const layer = document.createElement('div');
 
