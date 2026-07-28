@@ -120,26 +120,179 @@ function openFloorplanWindow() {
 
 <script>
   window.openCvReady = false;
+  window.openCvInitializationStarted = false;
 
-  function onOpenCvReady() {
-    window.openCvReady = true;
-
+  function setOpenCvStatus(
+    message,
+    statusClass
+  ) {
     const status =
       document.getElementById(
         'wallDetectionStatus'
       );
 
-    if (status) {
-      status.textContent =
-        'Bilderkennung ist bereit.';
+    if (!status) {
+      return;
     }
+
+    status.className =
+      'wall-detection-status' +
+      (
+        statusClass
+          ? ' ' + statusClass
+          : ''
+      );
+
+    status.textContent = message;
+  }
+
+  function markOpenCvReady() {
+    if (window.openCvReady) {
+      return;
+    }
+
+    window.openCvReady = true;
+
+    setOpenCvStatus(
+      'Bilderkennung ist bereit.',
+      'success'
+    );
+
+    /*
+     * Die dynamisch erzeugte Seitenleiste
+     * nochmals aktualisieren.
+     */
+    if (
+      typeof renderTemplateControls ===
+      'function'
+    ) {
+      renderTemplateControls();
+    }
+  }
+
+  function testOpenCvRuntime() {
+    if (
+      !window.cv ||
+      typeof window.cv.Mat !== 'function'
+    ) {
+      return false;
+    }
+
+    let testMat = null;
+
+    try {
+      testMat =
+        new window.cv.Mat(
+          1,
+          1,
+          window.cv.CV_8UC1
+        );
+
+      return (
+        testMat.rows === 1 &&
+        testMat.cols === 1
+      );
+    } catch (error) {
+      return false;
+    } finally {
+      try {
+        testMat?.delete();
+      } catch (error) {
+        // Testobjekt war noch nicht nutzbar.
+      }
+    }
+  }
+
+  function waitForOpenCvRuntime() {
+    if (window.openCvReady) {
+      return;
+    }
+
+    /*
+     * Einige OpenCV-Versionen stellen cv
+     * zunächst als Promise bereit.
+     */
+    if (
+      window.cv &&
+      typeof window.cv.then === 'function'
+    ) {
+      window.cv
+        .then((resolvedCv) => {
+          window.cv = resolvedCv;
+          waitForOpenCvRuntime();
+        })
+        .catch((error) => {
+          console.error(
+            'OpenCV konnte nicht initialisiert werden:',
+            error
+          );
+
+          setOpenCvStatus(
+            'Bilderkennung konnte nicht geladen werden.',
+            'warning'
+          );
+        });
+
+      return;
+    }
+
+    if (testOpenCvRuntime()) {
+      markOpenCvReady();
+      return;
+    }
+
+    window.setTimeout(
+      waitForOpenCvRuntime,
+      150
+    );
+  }
+
+  /*
+   * Klassische OpenCV.js-Initialisierung.
+   * Dieser Callback läuft erst, wenn die
+   * WebAssembly-Laufzeit bereit ist.
+   */
+  window.Module = {
+    onRuntimeInitialized() {
+      waitForOpenCvRuntime();
+    }
+  };
+
+  function handleOpenCvScriptLoaded() {
+    if (
+      window.openCvInitializationStarted
+    ) {
+      return;
+    }
+
+    window.openCvInitializationStarted =
+      true;
+
+    setOpenCvStatus(
+      'Bilderkennung wird initialisiert …',
+      'warning'
+    );
+
+    waitForOpenCvRuntime();
+  }
+
+  function handleOpenCvScriptError() {
+    console.error(
+      'Die Datei opencv.js konnte nicht geladen werden.'
+    );
+
+    setOpenCvStatus(
+      'Bilderkennung konnte nicht geladen werden.',
+      'warning'
+    );
   }
 </script>
 
 <script
   async
   src="https://docs.opencv.org/4.x/opencv.js"
-  onload="onOpenCvReady()"
+  onload="handleOpenCvScriptLoaded()"
+  onerror="handleOpenCvScriptError()"
   type="text/javascript"
 ></script>
 
@@ -3135,11 +3288,16 @@ function handleDetectedWallOverlayLeave() {
 }
 
 function isOpenCvAvailable() {
-  return Boolean(
-    window.openCvReady &&
-    window.cv &&
-    typeof window.cv.Mat === 'function'
-  );
+  if (
+    !window.openCvReady ||
+    !window.cv ||
+    typeof window.cv.Mat !== 'function' ||
+    typeof window.cv.imread !== 'function'
+  ) {
+    return false;
+  }
+
+  return testOpenCvRuntime();
 }
 
 function getDetectedLineLength(line) {
@@ -3374,8 +3532,44 @@ let edges = null;
 let lines = null;
 
     try {
-      src =
-        cv.imread(image);
+    if (!testOpenCvRuntime()) {
+  throw new Error(
+    'OpenCV ist noch nicht vollständig initialisiert.'
+  );
+}
+      const sourceCanvas =
+  document.createElement('canvas');
+
+sourceCanvas.width =
+  image.naturalWidth;
+
+sourceCanvas.height =
+  image.naturalHeight;
+
+const sourceContext =
+  sourceCanvas.getContext(
+    '2d',
+    {
+      willReadFrequently: true
+    }
+  );
+
+if (!sourceContext) {
+  throw new Error(
+    'Der Bildkontext konnte nicht erstellt werden.'
+  );
+}
+
+sourceContext.drawImage(
+  image,
+  0,
+  0,
+  sourceCanvas.width,
+  sourceCanvas.height
+);
+
+src =
+  cv.imread(sourceCanvas);
 
 const detectionArea =
   getValidDetectionArea(
@@ -3617,9 +3811,17 @@ saveTemplateToMainWindow();
         error
       );
 
-      alert(
-        'Die Vorlage konnte nicht analysiert werden.'
-      );
+      const errorMessage =
+  error instanceof Error
+    ? error.message
+    : String(error);
+
+alert(
+  'Die Vorlage konnte nicht analysiert werden.\n\n' +
+  'Technischer Hinweis: ' +
+  errorMessage
+);
+
     } finally {
       croppedSource?.delete();
       src?.delete();
