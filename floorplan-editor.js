@@ -1029,7 +1029,7 @@ let selectedRoomIndex = null;
 let mode = 'move';
 
 const SNAP_GRID_SIZE = 10;
-const CLOSE_SNAP_DISTANCE = 25;
+const CLOSE_SNAP_DISTANCE = 35;
 
 let snapEnabled = true;
 
@@ -2270,6 +2270,173 @@ function getOrthogonalClosingPoints(points) {
   ];
 }
 
+function getClosingInfo(points, mousePoint) {
+  if (
+    !Array.isArray(points) ||
+    points.length < 3 ||
+    !mousePoint
+  ) {
+    return null;
+  }
+
+  const firstPoint =
+    points[0];
+
+  const secondPoint =
+    points[1];
+
+  const lastPoint =
+    points[points.length - 1];
+
+  /*
+   * Möglichkeit 1:
+   * Die Maus befindet sich in der Nähe des
+   * ursprünglichen Startpunktes.
+   */
+  const startDistance =
+    Math.hypot(
+      mousePoint.x - firstPoint.x,
+      mousePoint.y - firstPoint.y
+    );
+
+  if (
+    startDistance <=
+    CLOSE_SNAP_DISTANCE
+  ) {
+    return {
+      type: 'start-point',
+
+      targetPoint: {
+        x: firstPoint.x,
+        y: firstPoint.y
+      },
+
+      previewPoints:
+        getOrthogonalClosingPoints(
+          points
+        )
+    };
+  }
+
+  /*
+   * Möglichkeit 2:
+   * Die erste Wand ist senkrecht.
+   *
+   * Dann kann eine waagerechte Abschlusswand
+   * auf diese erste Wand treffen.
+   */
+  if (
+    firstPoint.x === secondPoint.x
+  ) {
+    const minY =
+      Math.min(
+        firstPoint.y,
+        secondPoint.y
+      );
+
+    const maxY =
+      Math.max(
+        firstPoint.y,
+        secondPoint.y
+      );
+
+    const intersectionPoint = {
+      x: firstPoint.x,
+      y: lastPoint.y
+    };
+
+    const intersectionIsOnWall =
+      intersectionPoint.y >= minY &&
+      intersectionPoint.y <= maxY;
+
+    const mouseDistance =
+      Math.hypot(
+        mousePoint.x -
+          intersectionPoint.x,
+
+        mousePoint.y -
+          intersectionPoint.y
+      );
+
+    if (
+      intersectionIsOnWall &&
+      mouseDistance <=
+        CLOSE_SNAP_DISTANCE
+    ) {
+      return {
+        type: 'first-wall',
+
+        targetPoint:
+          intersectionPoint,
+
+        previewPoints: [
+          intersectionPoint
+        ]
+      };
+    }
+  }
+
+  /*
+   * Möglichkeit 3:
+   * Die erste Wand ist waagerecht.
+   *
+   * Dann kann eine senkrechte Abschlusswand
+   * auf diese erste Wand treffen.
+   */
+  if (
+    firstPoint.y === secondPoint.y
+  ) {
+    const minX =
+      Math.min(
+        firstPoint.x,
+        secondPoint.x
+      );
+
+    const maxX =
+      Math.max(
+        firstPoint.x,
+        secondPoint.x
+      );
+
+    const intersectionPoint = {
+      x: lastPoint.x,
+      y: firstPoint.y
+    };
+
+    const intersectionIsOnWall =
+      intersectionPoint.x >= minX &&
+      intersectionPoint.x <= maxX;
+
+    const mouseDistance =
+      Math.hypot(
+        mousePoint.x -
+          intersectionPoint.x,
+
+        mousePoint.y -
+          intersectionPoint.y
+      );
+
+    if (
+      intersectionIsOnWall &&
+      mouseDistance <=
+        CLOSE_SNAP_DISTANCE
+    ) {
+      return {
+        type: 'first-wall',
+
+        targetPoint:
+          intersectionPoint,
+
+        previewPoints: [
+          intersectionPoint
+        ]
+      };
+    }
+  }
+
+  return null;
+}
+
 function getWallDrawingLayer() {
   const workspace =
     document.getElementById('workspace');
@@ -2419,41 +2586,24 @@ function renderLineDrawing(mousePoint = null) {
   const firstPoint =
     points[0];
 
-  const closeDistance =
-    Math.hypot(
-      mousePoint.x - firstPoint.x,
-      mousePoint.y - firstPoint.y
-    );
+  const closingInfo =
+  getClosingInfo(
+    points,
+    mousePoint
+  );
 
-  /*
-   * Erst ab drei gesetzten Punkten darf der Raum
-   * automatisch geschlossen werden.
-   */
-  const shouldPreviewClosing =
-    points.length >= 3 &&
-    closeDistance <=
-      CLOSE_SNAP_DISTANCE;
+const shouldPreviewClosing =
+  Boolean(closingInfo);
 
-  /*
-   * Beim normalen Zeichnen enthält previewPoints
-   * nur einen Punkt.
-   *
-   * Beim automatischen Schließen können zwei Punkte
-   * enthalten sein:
-   * 1. automatisch ergänzter Eckpunkt
-   * 2. Startpunkt des Raumes
-   */
-  const previewPoints =
-    shouldPreviewClosing
-      ? getOrthogonalClosingPoints(
-          points
+const previewPoints =
+  closingInfo
+    ? closingInfo.previewPoints
+    : [
+        getOrthogonalPoint(
+          lastPoint,
+          mousePoint
         )
-      : [
-          getOrthogonalPoint(
-            lastPoint,
-            mousePoint
-          )
-        ];
+      ];
 
   let previewStart =
     lastPoint;
@@ -2596,38 +2746,81 @@ function handleLineDrawingClick(e) {
   const firstPoint =
     lineDrawing.points[0];
 
-  const closeDistance =
-  Math.hypot(
-    mousePoint.x - firstPoint.x,
-    mousePoint.y - firstPoint.y
+  const closingInfo =
+  getClosingInfo(
+    lineDrawing.points,
+    mousePoint
   );
 
+if (closingInfo) {
+  /*
+   * Sonderfall:
+   * Abschluss auf der ersten Wand.
+   *
+   * Der bisherige Startpunkt wird auf den
+   * Schnittpunkt verschoben. Dadurch wird
+   * der überstehende Teil der ersten Wand
+   * automatisch abgeschnitten.
+   */
   if (
-  lineDrawing.points.length >= 3 &&
-  closeDistance <=
-    CLOSE_SNAP_DISTANCE
-) {
-  const closingPoints =
-    getOrthogonalClosingPoints(
-      lineDrawing.points
-    );
+    closingInfo.type ===
+    'first-wall'
+  ) {
+    lineDrawing.points[0] = {
+      x:
+        closingInfo
+          .targetPoint.x,
 
-  closingPoints.forEach((point) => {
+      y:
+        closingInfo
+          .targetPoint.y
+    };
+
     const lastStoredPoint =
       lineDrawing.points[
         lineDrawing.points.length - 1
       ];
 
-    /*
-     * Doppelte Punkte vermeiden.
-     */
     if (
-      lastStoredPoint.x !== point.x ||
-      lastStoredPoint.y !== point.y
+      lastStoredPoint.x !==
+        closingInfo.targetPoint.x ||
+      lastStoredPoint.y !==
+        closingInfo.targetPoint.y
     ) {
-      lineDrawing.points.push(point);
+      lineDrawing.points.push({
+        x:
+          closingInfo
+            .targetPoint.x,
+
+        y:
+          closingInfo
+            .targetPoint.y
+      });
     }
-  });
+  } else {
+    /*
+     * Normaler Abschluss am ursprünglichen
+     * Startpunkt.
+     */
+    closingInfo.previewPoints.forEach(
+      (point) => {
+        const lastStoredPoint =
+          lineDrawing.points[
+            lineDrawing.points.length - 1
+          ];
+
+        if (
+          lastStoredPoint.x !== point.x ||
+          lastStoredPoint.y !== point.y
+        ) {
+          lineDrawing.points.push({
+            x: point.x,
+            y: point.y
+          });
+        }
+      }
+    );
+  }
 
   closeLineDrawing();
   return true;
