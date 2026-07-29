@@ -456,27 +456,7 @@ function openFloorplanWindow() {
     color: #1f2937 !important;
   opacity: 1 !important;
 }
-
-  .door {
-    position: absolute;
-    background: #eef1f4;
-    border: 2px solid #0b2a4a;
-    z-index: 3;
-  }
-
-  .door.top, .door.bottom {
-    height: 8px;
-  }
-
-  .door.left, .door.right {
-    width: 8px;
-  }
-
-  .door.top { top: -6px; border-bottom: none; }
-  .door.bottom { bottom: -6px; border-top: none; }
-  .door.left { left: -6px; border-right: none; }
-  .door.right { right: -6px; border-left: none; }
-
+    
   .sidebar {
     background: white;
     border-radius: 14px;
@@ -1358,6 +1338,141 @@ function openFloorplanWindow() {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.12);
 }
+
+/*
+ * Frei positionierbare Türen.
+ */
+.floorplan-door {
+  position: absolute;
+  z-index: 35;
+  box-sizing: border-box;
+  cursor: move;
+  user-select: none;
+  transform-origin: center center;
+}
+
+.floorplan-door-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.floorplan-door-opening {
+  fill: rgba(238, 241, 244, 0.96);
+  stroke: #0b2a4a;
+  stroke-width: 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.floorplan-door-leaf {
+  fill: none;
+  stroke: #0b2a4a;
+  stroke-width: 5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.floorplan-door-arc {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 3;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.floorplan-door.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+.floorplan-door.dimmed {
+  opacity: 0.42;
+}
+
+.door-resize-handle {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  background: #2563eb;
+  z-index: 4;
+}
+
+.door-resize-handle.nw {
+  left: -8px;
+  top: -8px;
+  cursor: nwse-resize;
+}
+
+.door-resize-handle.ne {
+  right: -8px;
+  top: -8px;
+  cursor: nesw-resize;
+}
+
+.door-resize-handle.sw {
+  left: -8px;
+  bottom: -8px;
+  cursor: nesw-resize;
+}
+
+.door-resize-handle.se {
+  right: -8px;
+  bottom: -8px;
+  cursor: nwse-resize;
+}
+
+.door-palette {
+  width: min(
+    720px,
+    calc(100vw - 32px)
+  );
+}
+
+.door-palette-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(110px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.door-palette-option {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 14px 10px;
+  border: 2px solid #d7d7d7;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0b2a4a;
+}
+
+.door-palette-option:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.door-palette-preview {
+  width: 72px;
+  height: 72px;
+}
+
+.door-placement-mode {
+  cursor: crosshair !important;
+}
+
+@media (max-width: 900px) {
+  .door-palette-grid {
+    grid-template-columns:
+      repeat(2, minmax(120px, 1fr));
+  }
+}
 </style>
 </head>
 <body>
@@ -1400,7 +1515,14 @@ function openFloorplanWindow() {
     Wände zeichnen
   </button>
 </div>
-<button id="doorModeBtn" onclick="setMode('door')" class="mode-btn">Tür setzen</button>
+<button
+  id="doorModeBtn"
+  type="button"
+  onclick="openDoorPalette()"
+  class="mode-btn"
+>
+  Tür setzen
+</button>
 <button id="distributorModeBtn" onclick="setMode('distributor')" class="mode-btn">Verteiler setzen</button>
 <button onclick="addFloorFromPlan()">Etage hinzufügen</button>
 <button onclick="deleteAllRooms()">Alle Räume löschen</button>
@@ -1443,6 +1565,14 @@ let modeCursorLabel = null;
 let distributorGhost = null;
 let distributorDrag = null;
 let templateDrag = null;
+
+/*
+ * Zustände für frei positionierbare Türen.
+ */
+let pendingDoor = null;
+let selectedDoor = null;
+let doorDrag = null;
+let doorResize = null;
 
 let wallEditMode = 'none';
 let selectedDetectedWallId = null;
@@ -1571,6 +1701,140 @@ function initRoomPosition(room, roomIndex) {
   }
 }
 
+function ensureRoomDoors(room) {
+  room.floorplan =
+    room.floorplan || {};
+
+  if (
+    !Array.isArray(
+      room.floorplan.doors
+    )
+  ) {
+    room.floorplan.doors = [];
+  }
+
+  /*
+   * Eine vorhandene Tür aus dem bisherigen
+   * System einmalig in das neue System
+   * übernehmen.
+   */
+  if (
+    room.floorplan.doorEnabled &&
+    !room.floorplan.legacyDoorMigrated &&
+    room.floorplan.doors.length === 0
+  ) {
+    const side =
+      room.floorplan.doorSide ||
+      'bottom';
+
+    const positionPercent =
+      Number(
+        room.floorplan.doorPosition
+      ) || 50;
+
+    const widthCentimeters =
+      Number(
+        room.floorplan.doorWidth
+      ) || 90;
+
+    const doorSize =
+      Math.max(
+        metersToPixels(
+          widthCentimeters / 100
+        ),
+        45
+      );
+
+    let x =
+      room.floorplan.x +
+      room.floorplan.width / 2 -
+      doorSize / 2;
+
+    let y =
+      room.floorplan.y +
+      room.floorplan.height -
+      doorSize / 2;
+
+    let rotation = 0;
+
+    if (
+      side === 'top' ||
+      side === 'bottom'
+    ) {
+      x =
+        room.floorplan.x +
+        room.floorplan.width *
+          positionPercent / 100 -
+        doorSize / 2;
+
+      y =
+        side === 'top'
+          ? room.floorplan.y -
+            doorSize / 2
+          : room.floorplan.y +
+            room.floorplan.height -
+            doorSize / 2;
+
+      rotation =
+        side === 'top'
+          ? 180
+          : 0;
+    } else {
+      y =
+        room.floorplan.y +
+        room.floorplan.height *
+          positionPercent / 100 -
+        doorSize / 2;
+
+      x =
+        side === 'left'
+          ? room.floorplan.x -
+            doorSize / 2
+          : room.floorplan.x +
+            room.floorplan.width -
+            doorSize / 2;
+
+      rotation =
+        side === 'left'
+          ? 90
+          : 270;
+    }
+
+    room.floorplan.doors.push({
+      id:
+        createDoorId(),
+
+      x,
+      y,
+
+      width:
+        doorSize,
+
+      height:
+        doorSize,
+
+      rotation,
+
+      hinge:
+        'left'
+    });
+
+    room.floorplan.legacyDoorMigrated =
+      true;
+  }
+}
+
+function createDoorId() {
+  return (
+    'door-' +
+    Date.now() +
+    '-' +
+    Math.random()
+      .toString(36)
+      .slice(2, 9)
+  );
+}
+
 function renderTabs() {
   const tabs = document.getElementById('tabs');
 
@@ -1617,7 +1881,14 @@ function setMode(newMode) {
     'active-mode',
     mode === 'draw-lines'
   );
-  document.getElementById('doorModeBtn')?.classList.toggle('active-mode', mode === 'door');
+  document
+  .getElementById(
+    'doorModeBtn'
+  )
+  ?.classList.toggle(
+    'active-mode',
+    mode === 'door-place'
+  );
   document.getElementById('distributorModeBtn')?.classList.toggle('active-mode', mode === 'distributor');
   document
   .getElementById('workspace')
@@ -1639,14 +1910,17 @@ function setMode(newMode) {
     'draw-lines-mode',
     mode === 'draw-lines'
   );
-  document.getElementById('workspace')?.classList.toggle('door-mode', mode === 'door');
+  document
+  .getElementById(
+    'workspace'
+  )
+  ?.classList.toggle(
+    'door-placement-mode',
+    mode === 'door-place'
+  );
   document.getElementById('workspace')?.classList.toggle('distributor-mode', mode === 'distributor');
 
   removeModeHelpers();
-
-  if (mode === 'door') {
-    createModeCursorLabel('Tür in diesen Raum setzen');
-  }
 
   if (mode === 'distributor') {
     createModeCursorLabel('Verteiler absetzen');
@@ -1658,6 +1932,534 @@ function setMode(newMode) {
     'Startpunkt setzen – danach weitere Punkte anklicken – Endpunkt = Startpunkt'
   );
   }
+}
+
+function placePendingDoor(
+  event
+) {
+  if (!pendingDoor) {
+    return;
+  }
+
+  const workspace =
+    document.getElementById(
+      'workspace'
+    );
+
+  const workspaceRect =
+    workspace
+      .getBoundingClientRect();
+
+  const clickX =
+    event.clientX -
+    workspaceRect.left +
+    workspace.scrollLeft;
+
+  const clickY =
+    event.clientY -
+    workspaceRect.top +
+    workspace.scrollTop;
+
+  const roomIndex =
+    findRoomAtWorkspacePoint(
+      clickX,
+      clickY
+    );
+
+  if (
+    roomIndex === null
+  ) {
+    alert(
+      'Bitte positionieren Sie die Tür zunächst innerhalb eines Raumes. Anschließend kann sie frei verschoben werden.'
+    );
+
+    return;
+  }
+
+  const room =
+    floorData[
+      activeFloorIndex
+    ].rooms[
+      roomIndex
+    ];
+
+  ensureRoomDoors(room);
+
+  const defaultSize =
+    Math.max(
+      metersToPixels(0.90),
+      55
+    );
+
+  const door = {
+    id:
+      createDoorId(),
+
+    x:
+      snapValue(
+        clickX -
+        defaultSize / 2
+      ),
+
+    y:
+      snapValue(
+        clickY -
+        defaultSize / 2
+      ),
+
+    width:
+      defaultSize,
+
+    height:
+      defaultSize,
+
+    rotation:
+      pendingDoor.rotation,
+
+    hinge:
+      pendingDoor.hinge
+  };
+
+  room.floorplan.doors.push(
+    door
+  );
+
+  if (
+    !saveRoomDoors(
+      roomIndex
+    )
+  ) {
+    room.floorplan.doors.pop();
+
+    alert(
+      'Die Tür konnte nicht im Haupt-Konfigurator gespeichert werden.'
+    );
+
+    return;
+  }
+
+  selectedDoor = {
+    roomIndex,
+    doorId:
+      door.id
+  };
+
+  pendingDoor = null;
+
+  setMode('move');
+  renderFloor();
+}
+
+function startDoorDrag(
+  event
+) {
+  if (
+    mode !== 'move'
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
+  if (
+    event.target
+      .classList
+      .contains(
+        'door-resize-handle'
+      )
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const element =
+    event.currentTarget;
+
+  const roomIndex =
+    Number(
+      element.dataset.roomIndex
+    );
+
+  const doorId =
+    element.dataset.doorId;
+
+  const reference =
+    getDoorReference(
+      roomIndex,
+      doorId
+    );
+
+  if (!reference) {
+    return;
+  }
+
+  selectedDoor = {
+    roomIndex,
+    doorId
+  };
+
+  doorDrag = {
+    roomIndex,
+    door:
+      reference.door,
+
+    element,
+
+    startX:
+      event.clientX,
+
+    startY:
+      event.clientY,
+
+    originalX:
+      reference.door.x,
+
+    originalY:
+      reference.door.y
+  };
+
+  document.addEventListener(
+    'mousemove',
+    handleDoorDrag
+  );
+
+  document.addEventListener(
+    'mouseup',
+    finishDoorDrag
+  );
+}
+
+function handleDoorDrag(
+  event
+) {
+  if (!doorDrag) {
+    return;
+  }
+
+  const deltaX =
+    event.clientX -
+    doorDrag.startX;
+
+  const deltaY =
+    event.clientY -
+    doorDrag.startY;
+
+  const newX =
+    Math.max(
+      0,
+      snapValue(
+        doorDrag.originalX +
+        deltaX
+      )
+    );
+
+  const newY =
+    Math.max(
+      0,
+      snapValue(
+        doorDrag.originalY +
+        deltaY
+      )
+    );
+
+  doorDrag.door.x =
+    newX;
+
+  doorDrag.door.y =
+    newY;
+
+  doorDrag.element.style.left =
+    newX + 'px';
+
+  doorDrag.element.style.top =
+    newY + 'px';
+}
+
+function finishDoorDrag() {
+  if (!doorDrag) {
+    return;
+  }
+
+  saveRoomDoors(
+    doorDrag.roomIndex
+  );
+
+  document.removeEventListener(
+    'mousemove',
+    handleDoorDrag
+  );
+
+  document.removeEventListener(
+    'mouseup',
+    finishDoorDrag
+  );
+
+  doorDrag = null;
+}
+
+function startDoorResize(
+  event
+) {
+  if (
+    mode !== 'move'
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const element =
+    event.currentTarget.closest(
+      '.floorplan-door'
+    );
+
+  const roomIndex =
+    Number(
+      element.dataset.roomIndex
+    );
+
+  const doorId =
+    element.dataset.doorId;
+
+  const reference =
+    getDoorReference(
+      roomIndex,
+      doorId
+    );
+
+  if (!reference) {
+    return;
+  }
+
+  doorResize = {
+    roomIndex,
+    door:
+      reference.door,
+
+    element,
+
+    handle:
+      event.currentTarget
+        .dataset.resize,
+
+    startX:
+      event.clientX,
+
+    startY:
+      event.clientY,
+
+    originalX:
+      reference.door.x,
+
+    originalY:
+      reference.door.y,
+
+    originalSize:
+      reference.door.width
+  };
+
+  document.addEventListener(
+    'mousemove',
+    handleDoorResize
+  );
+
+  document.addEventListener(
+    'mouseup',
+    finishDoorResize
+  );
+}
+
+function handleDoorResize(
+  event
+) {
+  if (!doorResize) {
+    return;
+  }
+
+  const deltaX =
+    event.clientX -
+    doorResize.startX;
+
+  const deltaY =
+    event.clientY -
+    doorResize.startY;
+
+  const horizontalChange =
+    doorResize.handle.includes(
+      'w'
+    )
+      ? -deltaX
+      : deltaX;
+
+  const verticalChange =
+    doorResize.handle.includes(
+      'n'
+    )
+      ? -deltaY
+      : deltaY;
+
+  const sizeChange =
+    Math.abs(horizontalChange) >
+      Math.abs(verticalChange)
+      ? horizontalChange
+      : verticalChange;
+
+  const minimumSize =
+    Math.max(
+      metersToPixels(0.50),
+      35
+    );
+
+  const maximumSize =
+    Math.max(
+      metersToPixels(2),
+      140
+    );
+
+  const newSize =
+    Math.min(
+      maximumSize,
+      Math.max(
+        minimumSize,
+        snapValue(
+          doorResize.originalSize +
+          sizeChange
+        )
+      )
+    );
+
+  let newX =
+    doorResize.originalX;
+
+  let newY =
+    doorResize.originalY;
+
+  if (
+    doorResize.handle.includes(
+      'w'
+    )
+  ) {
+    newX =
+      doorResize.originalX +
+      doorResize.originalSize -
+      newSize;
+  }
+
+  if (
+    doorResize.handle.includes(
+      'n'
+    )
+  ) {
+    newY =
+      doorResize.originalY +
+      doorResize.originalSize -
+      newSize;
+  }
+
+  doorResize.door.x =
+    newX;
+
+  doorResize.door.y =
+    newY;
+
+  doorResize.door.width =
+    newSize;
+
+  doorResize.door.height =
+    newSize;
+
+  doorResize.element.style.left =
+    newX + 'px';
+
+  doorResize.element.style.top =
+    newY + 'px';
+
+  doorResize.element.style.width =
+    newSize + 'px';
+
+  doorResize.element.style.height =
+    newSize + 'px';
+}
+
+function finishDoorResize() {
+  if (!doorResize) {
+    return;
+  }
+
+  saveRoomDoors(
+    doorResize.roomIndex
+  );
+
+  document.removeEventListener(
+    'mousemove',
+    handleDoorResize
+  );
+
+  document.removeEventListener(
+    'mouseup',
+    finishDoorResize
+  );
+
+  doorResize = null;
+
+  renderFloor();
+}
+
+function deleteSelectedDoor() {
+  if (!selectedDoor) {
+    return false;
+  }
+
+  const reference =
+    getDoorReference(
+      selectedDoor.roomIndex,
+      selectedDoor.doorId
+    );
+
+  if (!reference) {
+    selectedDoor = null;
+    return false;
+  }
+
+  const confirmed =
+    confirm(
+      'Möchten Sie die ausgewählte Tür wirklich löschen?'
+    );
+
+  if (!confirmed) {
+    return true;
+  }
+
+  reference.room
+    .floorplan
+    .doors
+    .splice(
+      reference.doorIndex,
+      1
+    );
+
+  if (
+    !saveRoomDoors(
+      selectedDoor.roomIndex
+    )
+  ) {
+    alert(
+      'Die Tür konnte nicht im Haupt-Konfigurator gelöscht werden.'
+    );
+
+    return true;
+  }
+
+  selectedDoor = null;
+
+  renderFloor();
+
+  return true;
 }
 
 function toggleSnap() {
@@ -1903,6 +2705,7 @@ roomCards.innerHTML = floor.rooms.map((room, index) => {
 }
 
 function selectRoom(roomIndex) {
+  selectedDoor = null;
   selectedRoomIndex = roomIndex;
 
   document.querySelectorAll('.room').forEach((roomEl) => {
@@ -4424,6 +5227,9 @@ function createDetectedRoomObject(
       doorWidth:
         90,
 
+      doors:
+        [],
+
       /*
        * Kennzeichnung für spätere
        * Auswertungen oder erneute Erkennung.
@@ -5542,8 +6348,7 @@ function renderFloor() {
   const workspace = document.getElementById('workspace');
   const floor = floorData[activeFloorIndex];
 
-  workspace.innerHTML = '';
-  selectedRoomIndex = null;
+workspace.innerHTML = '';
 
   renderTemplate();
 
@@ -5617,14 +6422,7 @@ if (isPolygon) {
     );
   }
 }
-
-  if (
-  !isPolygon &&
-  room.floorplan.doorEnabled
-) {
-  div.appendChild(createDoor(room));
-}
-
+ 
 if (!isPolygon) {
   ['nw', 'ne', 'sw', 'se'].forEach((pos) => {
     const handle =
@@ -5661,49 +6459,768 @@ if (!isPolygon) {
     return;
   }
 
-  if (mode === 'door') {
-    e.stopPropagation();
-
-    if (isPolygon) {
-      alert(
-        'Türen an frei gezeichneten Raumkonturen werden im nächsten Erweiterungsschritt einzelnen Wandabschnitten zugeordnet.'
-      );
-      return;
-    }
-
-    openDoorDialog(roomIndex);
-    return;
-  }
-
   selectRoom(roomIndex);
 });
 
     workspace.appendChild(div);
   });
 
+    renderFloorplanDoors();  
     renderDistributor();
     renderTemplateControls();
     renderSidebar();
 }
 
-function createDoor(room) {
-  const door = document.createElement('div');
-  const side = room.floorplan.doorSide || 'bottom';
-  const pos = Number(room.floorplan.doorPosition) || 50;
-  const doorWidthCm = Number(room.floorplan.doorWidth) || 90;
-  const doorWidthPx = Math.max(doorWidthCm * 0.7, 42);
+function getDoorReference(
+  roomIndex,
+  doorId
+) {
+  const room =
+    floorData[
+      activeFloorIndex
+    ].rooms[
+      roomIndex
+    ];
 
-  door.className = 'door ' + side;
-
-  if (side === 'top' || side === 'bottom') {
-    door.style.width = doorWidthPx + 'px';
-    door.style.left = 'calc(' + pos + '% - ' + (doorWidthPx / 2) + 'px)';
-  } else {
-    door.style.height = doorWidthPx + 'px';
-    door.style.top = 'calc(' + pos + '% - ' + (doorWidthPx / 2) + 'px)';
+  if (!room) {
+    return null;
   }
 
-  return door;
+  ensureRoomDoors(room);
+
+  const doorIndex =
+    room.floorplan.doors.findIndex(
+      (door) =>
+        door.id === doorId
+    );
+
+  if (doorIndex < 0) {
+    return null;
+  }
+
+  return {
+    room,
+    door:
+      room.floorplan.doors[
+        doorIndex
+      ],
+
+    doorIndex
+  };
+}
+
+function saveRoomDoors(
+  roomIndex
+) {
+  const room =
+    floorData[
+      activeFloorIndex
+    ].rooms[
+      roomIndex
+    ];
+
+  if (!room) {
+    return false;
+  }
+
+  return Boolean(
+    window.opener &&
+    typeof window.opener
+      .updateRoomFloorplanFromWindow ===
+      'function' &&
+
+    window.opener
+      .updateRoomFloorplanFromWindow(
+        activeFloorIndex,
+        roomIndex,
+        {
+          ...room.floorplan,
+
+          doors:
+            room.floorplan.doors
+        }
+      )
+  );
+}
+
+function findRoomAtWorkspacePoint(
+  x,
+  y
+) {
+  const floor =
+    floorData[
+      activeFloorIndex
+    ];
+
+  for (
+    let roomIndex =
+      floor.rooms.length - 1;
+
+    roomIndex >= 0;
+    roomIndex--
+  ) {
+    const room =
+      floor.rooms[
+        roomIndex
+      ];
+
+    const fp =
+      room.floorplan || {};
+
+    const isPolygon =
+      fp.shapeType ===
+        'polygon' &&
+      Array.isArray(
+        fp.points
+      ) &&
+      fp.points.length >= 3;
+
+    if (isPolygon) {
+      const absolutePoints =
+        fp.points.map(
+          (point) => ({
+            x:
+              Number(fp.x) +
+              Number(point.x),
+
+            y:
+              Number(fp.y) +
+              Number(point.y)
+          })
+        );
+
+      if (
+        isPointInPolygon(
+          { x, y },
+          absolutePoints
+        )
+      ) {
+        return roomIndex;
+      }
+
+      continue;
+    }
+
+    const left =
+      Number(fp.x) || 0;
+
+    const top =
+      Number(fp.y) || 0;
+
+    const right =
+      left +
+      (
+        Number(fp.width) ||
+        0
+      );
+
+    const bottom =
+      top +
+      (
+        Number(fp.height) ||
+        0
+      );
+
+    if (
+      x >= left &&
+      x <= right &&
+      y >= top &&
+      y <= bottom
+    ) {
+      return roomIndex;
+    }
+  }
+
+  return null;
+}
+
+function isPointInPolygon(
+  point,
+  polygon
+) {
+  let inside = false;
+
+  for (
+    let currentIndex = 0,
+        previousIndex =
+          polygon.length - 1;
+
+    currentIndex <
+      polygon.length;
+
+    previousIndex =
+      currentIndex++
+  ) {
+    const current =
+      polygon[
+        currentIndex
+      ];
+
+    const previous =
+      polygon[
+        previousIndex
+      ];
+
+    const intersects =
+      (
+        current.y >
+        point.y
+      ) !==
+      (
+        previous.y >
+        point.y
+      ) &&
+
+      point.x <
+        (
+          (
+            previous.x -
+            current.x
+          ) *
+          (
+            point.y -
+            current.y
+          )
+        ) /
+        (
+          previous.y -
+          current.y
+        ) +
+        current.x;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function renderFloorplanDoors() {
+  const workspace =
+    document.getElementById(
+      'workspace'
+    );
+
+  const floor =
+    floorData[
+      activeFloorIndex
+    ];
+
+  floor.rooms.forEach(
+    (room, roomIndex) => {
+      ensureRoomDoors(room);
+
+      room.floorplan.doors.forEach(
+        (door) => {
+          const doorElement =
+            createFloorplanDoorElement(
+              door,
+              roomIndex
+            );
+
+          workspace.appendChild(
+            doorElement
+          );
+        }
+      );
+    }
+  );
+}
+
+function createFloorplanDoorElement(
+  door,
+  roomIndex
+) {
+  const element =
+    document.createElement('div');
+
+  element.className =
+    'floorplan-door';
+
+  element.dataset.doorId =
+    door.id;
+
+  element.dataset.roomIndex =
+    String(roomIndex);
+
+  element.style.left =
+    door.x + 'px';
+
+  element.style.top =
+    door.y + 'px';
+
+  element.style.width =
+    door.width + 'px';
+
+  element.style.height =
+    door.height + 'px';
+
+  element.style.transform =
+    'rotate(' +
+    (
+      Number(door.rotation) ||
+      0
+    ) +
+    'deg)';
+
+  const isSelected =
+    selectedDoor &&
+    selectedDoor.doorId ===
+      door.id &&
+    selectedDoor.roomIndex ===
+      roomIndex;
+
+  element.classList.toggle(
+    'selected',
+    Boolean(isSelected)
+  );
+
+  element.classList.toggle(
+    'dimmed',
+    Boolean(
+      selectedDoor &&
+      !isSelected
+    )
+  );
+
+  element.appendChild(
+    createDoorSvg(
+      door.hinge ||
+      'left'
+    )
+  );
+
+  element.addEventListener(
+    'mousedown',
+    startDoorDrag
+  );
+
+  element.addEventListener(
+    'click',
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      selectDoor(
+        roomIndex,
+        door.id
+      );
+    }
+  );
+
+  if (isSelected) {
+    [
+      'nw',
+      'ne',
+      'sw',
+      'se'
+    ].forEach(
+      (position) => {
+        const handle =
+          document.createElement(
+            'div'
+          );
+
+        handle.className =
+          'door-resize-handle ' +
+          position;
+
+        handle.dataset.resize =
+          position;
+
+        handle.addEventListener(
+          'mousedown',
+          startDoorResize
+        );
+
+        element.appendChild(
+          handle
+        );
+      }
+    );
+  }
+
+  return element;
+}
+
+function selectDoor(
+  roomIndex,
+  doorId
+) {
+  selectedRoomIndex = null;
+
+  selectedDoor = {
+    roomIndex,
+    doorId
+  };
+
+  renderFloor();
+}
+
+function createDoorSvg(
+  hinge
+) {
+  const svgNamespace =
+    'http://www.w3.org/2000/svg';
+
+  const svg =
+    document.createElementNS(
+      svgNamespace,
+      'svg'
+    );
+
+  svg.setAttribute(
+    'viewBox',
+    '0 0 100 100'
+  );
+
+  svg.setAttribute(
+    'class',
+    'floorplan-door-svg'
+  );
+
+  /*
+   * Die Wandöffnung liegt an der unteren
+   * Kante des Türsymbols.
+   */
+  const opening =
+    document.createElementNS(
+      svgNamespace,
+      'line'
+    );
+
+  opening.setAttribute(
+    'x1',
+    '4'
+  );
+
+  opening.setAttribute(
+    'y1',
+    '96'
+  );
+
+  opening.setAttribute(
+    'x2',
+    '96'
+  );
+
+  opening.setAttribute(
+    'y2',
+    '96'
+  );
+
+  opening.setAttribute(
+    'class',
+    'floorplan-door-opening'
+  );
+
+  svg.appendChild(opening);
+
+  const leaf =
+    document.createElementNS(
+      svgNamespace,
+      'line'
+    );
+
+  const arc =
+    document.createElementNS(
+      svgNamespace,
+      'path'
+    );
+
+  leaf.setAttribute(
+    'class',
+    'floorplan-door-leaf'
+  );
+
+  arc.setAttribute(
+    'class',
+    'floorplan-door-arc'
+  );
+
+  if (hinge === 'right') {
+    /*
+     * Türanschlag rechts.
+     */
+    leaf.setAttribute(
+      'x1',
+      '96'
+    );
+
+    leaf.setAttribute(
+      'y1',
+      '96'
+    );
+
+    leaf.setAttribute(
+      'x2',
+      '96'
+    );
+
+    leaf.setAttribute(
+      'y2',
+      '4'
+    );
+
+    arc.setAttribute(
+      'd',
+      'M 4 96 A 92 92 0 0 1 96 4'
+    );
+  } else {
+    /*
+     * Türanschlag links.
+     */
+    leaf.setAttribute(
+      'x1',
+      '4'
+    );
+
+    leaf.setAttribute(
+      'y1',
+      '96'
+    );
+
+    leaf.setAttribute(
+      'x2',
+      '4'
+    );
+
+    leaf.setAttribute(
+      'y2',
+      '4'
+    );
+
+    arc.setAttribute(
+      'd',
+      'M 96 96 A 92 92 0 0 0 4 4'
+    );
+  }
+
+  svg.appendChild(arc);
+  svg.appendChild(leaf);
+
+  return svg;
+}
+
+function openDoorPalette() {
+  removeModeHelpers();
+
+  const floor =
+    floorData[
+      activeFloorIndex
+    ];
+
+  if (
+    !floor.rooms.length
+  ) {
+    alert(
+      'Bitte legen Sie zuerst mindestens einen Raum an.'
+    );
+
+    return;
+  }
+
+  const backdrop =
+    document.createElement('div');
+
+  backdrop.className =
+    'draw-modal-backdrop';
+
+  backdrop.innerHTML =
+    '<div class="draw-modal door-palette">' +
+
+      '<h3>Tür auswählen</h3>' +
+
+      '<p class="hint">' +
+        'Wählen Sie die Öffnungsrichtung aus. ' +
+        'Danach klicken Sie im Grundriss auf die gewünschte Position.' +
+      '</p>' +
+
+      '<div ' +
+        'id="doorPaletteGrid" ' +
+        'class="door-palette-grid">' +
+      '</div>' +
+
+      '<div class="draw-modal-actions">' +
+        '<button ' +
+          'type="button" ' +
+          'id="cancelDoorPalette">' +
+          'Abbrechen' +
+        '</button>' +
+      '</div>' +
+
+    '</div>';
+
+  document.body.appendChild(
+    backdrop
+  );
+
+  const variants = [
+    {
+      label: 'Unten · links',
+      rotation: 0,
+      hinge: 'left'
+    },
+    {
+      label: 'Unten · rechts',
+      rotation: 0,
+      hinge: 'right'
+    },
+    {
+      label: 'Links · oben',
+      rotation: 90,
+      hinge: 'left'
+    },
+    {
+      label: 'Links · unten',
+      rotation: 90,
+      hinge: 'right'
+    },
+    {
+      label: 'Oben · rechts',
+      rotation: 180,
+      hinge: 'left'
+    },
+    {
+      label: 'Oben · links',
+      rotation: 180,
+      hinge: 'right'
+    },
+    {
+      label: 'Rechts · unten',
+      rotation: 270,
+      hinge: 'left'
+    },
+    {
+      label: 'Rechts · oben',
+      rotation: 270,
+      hinge: 'right'
+    }
+  ];
+
+  const grid =
+    document.getElementById(
+      'doorPaletteGrid'
+    );
+
+  variants.forEach(
+    (variant) => {
+      const button =
+        document.createElement(
+          'button'
+        );
+
+      button.type =
+        'button';
+
+      button.className =
+        'door-palette-option';
+
+      const preview =
+        document.createElement(
+          'div'
+        );
+
+      preview.className =
+        'door-palette-preview';
+
+      preview.style.transform =
+        'rotate(' +
+        variant.rotation +
+        'deg)';
+
+      preview.appendChild(
+        createDoorSvg(
+          variant.hinge
+        )
+      );
+
+      const label =
+        document.createElement(
+          'span'
+        );
+
+      label.textContent =
+        variant.label;
+
+      button.appendChild(
+        preview
+      );
+
+      button.appendChild(
+        label
+      );
+
+      button.addEventListener(
+        'click',
+        () => {
+          pendingDoor = {
+            rotation:
+              variant.rotation,
+
+            hinge:
+              variant.hinge
+          };
+
+          backdrop.remove();
+
+          startDoorPlacement();
+        }
+      );
+
+      grid.appendChild(
+        button
+      );
+    }
+  );
+
+  document
+    .getElementById(
+      'cancelDoorPalette'
+    )
+    .addEventListener(
+      'click',
+      () => {
+        pendingDoor = null;
+        backdrop.remove();
+      }
+    );
+}
+
+function startDoorPlacement() {
+  if (!pendingDoor) {
+    return;
+  }
+
+  mode = 'door-place';
+
+  selectedRoomIndex = null;
+  selectedDoor = null;
+
+  document
+    .getElementById(
+      'doorModeBtn'
+    )
+    ?.classList.add(
+      'active-mode'
+    );
+
+  document
+    .getElementById(
+      'workspace'
+    )
+    ?.classList.add(
+      'door-placement-mode'
+    );
+
+  removeModeHelpers();
+
+  createModeCursorLabel(
+    'Tür im Grundriss positionieren'
+  );
+
+  renderFloor();
 }
 
 function renderDistributor() {
@@ -5783,91 +7300,11 @@ function stopDistributorDrag() {
   distributorDrag = null;
 }
 
-function openDoorDialog(roomIndex) {
-  removeModeHelpers();
-
-  const room = floorData[activeFloorIndex].rooms[roomIndex];
-  const fp = room.floorplan || {};
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'draw-modal-backdrop';
-
-  backdrop.innerHTML =
-    '<div class="draw-modal">' +
-      '<h3>Tür setzen</h3>' +
-      '<div class="draw-grid">' +
-        '<div class="draw-field">' +
-          '<label>Tür vorhanden?</label>' +
-          '<select id="doorEnabled">' +
-            '<option value="ja">Ja</option>' +
-            '<option value="nein">Nein</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="draw-field">' +
-          '<label>Türseite</label>' +
-          '<select id="doorSide">' +
-            '<option value="top">oben</option>' +
-            '<option value="right">rechts</option>' +
-            '<option value="bottom">unten</option>' +
-            '<option value="left">links</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="draw-field">' +
-          '<label>Position %</label>' +
-          '<input id="doorPosition" type="number" min="5" max="95" step="5" value="' + (fp.doorPosition || 50) + '">' +
-        '</div>' +
-        '<div class="draw-field">' +
-          '<label>Türbreite cm</label>' +
-          '<input id="doorWidth" type="number" min="60" max="140" step="5" value="' + (fp.doorWidth || 90) + '">' +
-        '</div>' +
-      '</div>' +
-      '<div class="draw-modal-actions">' +
-        '<button type="button" id="cancelDoorDialog">Abbrechen</button>' +
-        '<button type="button" id="saveDoorDialog">Tür übernehmen</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(backdrop);
- 
-  document.getElementById('doorEnabled').value = fp.doorEnabled ? 'ja' : 'nein';
-  document.getElementById('doorSide').value = fp.doorSide || 'bottom';
-
-  document.getElementById('cancelDoorDialog').addEventListener('click', () => {
-    backdrop.remove();
-  });
-
-  document.getElementById('saveDoorDialog').addEventListener('click', () => {
-    const newFloorplan = {
-      ...room.floorplan,
-      doorEnabled: document.getElementById('doorEnabled').value === 'ja',
-      doorSide: document.getElementById('doorSide').value,
-      doorPosition: Number(document.getElementById('doorPosition').value) || 50,
-      doorWidth: Number(document.getElementById('doorWidth').value) || 90
-    };
-
-    const saved =
-      window.opener &&
-      typeof window.opener.updateRoomFloorplanFromWindow === 'function'
-        ? window.opener.updateRoomFloorplanFromWindow(activeFloorIndex, roomIndex, newFloorplan)
-        : false;
-
-    if (!saved) {
-      alert('Die Tür konnte nicht im Haupt-Konfigurator gespeichert werden.');
-      return;
-    }
-
-    room.floorplan = newFloorplan;
-
-    backdrop.remove();
-    setMode('move');
-    renderFloor();
-    selectRoom(roomIndex);
-  });
-}
-
 function setFloor(index) {
   activeFloorIndex = index;
   selectedRoomIndex = null;
+  selectedDoor = null;
+  pendingDoor = null;
 
   calibration.active = false;
   calibration.points = [];
@@ -7537,7 +8974,8 @@ points: Array.isArray(shape.points)
         doorEnabled: false,
         doorSide: 'bottom',
         doorPosition: 50,
-        doorWidth: 90
+        doorWidth: 90,
+        doors: []
       }
     };
 
@@ -7574,54 +9012,6 @@ function autoArrange() {
 
   renderFloor();
 }
-
-setMode('move');
-renderFloor();
-
-document
-  .getElementById('uploadTemplateBtn')
-  .addEventListener('click', openTemplateFileDialog);
-
-document
-  .getElementById('templateFileInput')
-  .addEventListener('change', handleTemplateUpload);
-
-document.getElementById('workspace').addEventListener('mousedown', startDraw);
-
-document.addEventListener('keydown', (e) => {
-
-  if (
-  mode === 'draw-lines' &&
-  e.key === 'Escape'
-) {
-  e.preventDefault();
-  cancelLineDrawing();
-  return;
-}
-
-if (
-  mode === 'draw-lines' &&
-  (
-    e.key === 'Backspace' ||
-    e.key === 'Delete' ||
-    e.key === 'Entf'
-  )
-) {
-  e.preventDefault();
-  removeLastLinePoint();
-  return;
-}
-
-  if (e.key !== 'Delete' && e.key !== 'Entf' && e.key !== 'Backspace') return;
-
-  e.preventDefault();
-
-  const activeTag = document.activeElement?.tagName?.toLowerCase();
-  if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') return;
-
-  deleteSelectedRoom();
-  
-});
 
 function getActiveFloor() {
   return floorData[activeFloorIndex];
@@ -8542,6 +9932,16 @@ document
   return;
   }
 
+if (
+  mode === 'door-place'
+) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  placePendingDoor(e);
+  return;
+}
+
     if (mode === 'calibrate') {
       e.preventDefault();
       e.stopPropagation();
@@ -8648,6 +10048,13 @@ if (
   return;
 }
 
+if (selectedDoor) {
+  e.preventDefault();
+
+  deleteSelectedDoor();
+  return;
+}
+
 e.preventDefault();
 deleteSelectedRoom();
   }
@@ -8659,6 +10066,20 @@ document.addEventListener(
     if (event.key !== 'Escape') {
       return;
     }
+
+if (
+  mode === 'door-place'
+) {
+  event.preventDefault();
+
+  pendingDoor = null;
+  selectedDoor = null;
+
+  setMode('move');
+  renderFloor();
+
+  return;
+}
 
 if (
   detectionAreaSelection.active
