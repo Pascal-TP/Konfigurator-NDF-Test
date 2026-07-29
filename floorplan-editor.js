@@ -1467,6 +1467,52 @@ let calibration = {
 
 const DEFAULT_PIXELS_PER_METER = 42;
 
+/*
+ * Einstellungen für die automatische
+ * Raumerzeugung aus Wandlinien.
+ */
+const ROOM_DETECTION_SETTINGS = {
+  /*
+   * Maximale Lücke zwischen zwei ungefähr
+   * fluchtenden Wandstücken.
+   *
+   * 1,20 m schließt in der Regel auch
+   * normale Türöffnungen.
+   */
+  maxGapMeters: 1.20,
+
+  /*
+   * Toleranz zum Zusammenfassen fast
+   * gleich liegender Wandachsen.
+   */
+  axisToleranceMeters: 0.12,
+
+  /*
+   * Virtuelle Wandstärke für die
+   * Flächenerkennung.
+   */
+  wallThicknessMeters: 0.14,
+
+  /*
+   * Sehr kleine erkannte Flächen werden
+   * verworfen.
+   */
+  minimumRoomAreaSquareMeters: 1.50,
+
+  /*
+   * Sicherheitsgrenze gegen versehentlich
+   * erkannte riesige Außenflächen.
+   */
+  maximumRoomAreaSquareMeters: 500,
+
+  /*
+   * Vereinfachung der erkannten Kontur.
+   * Der Wert wird relativ zum Umfang
+   * verwendet.
+   */
+  contourApproximationFactor: 0.004
+};
+
 function getRoomSize(room) {
   const area = Math.max(Number(room.area) || 8, 4);
   const ratio = 1.35;
@@ -3257,6 +3303,1502 @@ function handleDetectedWallOverlayLeave() {
     null;
 
   refreshDetectedWallOverlay();
+}
+
+function prepareWallsForRoomDetection(
+  walls
+) {
+  if (
+    !Array.isArray(walls)
+  ) {
+    return [];
+  }
+
+  const pixelsPerMeter =
+    getTemplateImagePixelsPerMeter();
+
+  const axisTolerance =
+    Math.max(
+      2,
+      ROOM_DETECTION_SETTINGS
+        .axisToleranceMeters *
+        pixelsPerMeter
+    );
+
+  const maximumGap =
+    Math.max(
+      4,
+      ROOM_DETECTION_SETTINGS
+        .maxGapMeters *
+        pixelsPerMeter
+    );
+
+  const normalizedWalls =
+    walls
+      .map((wall) =>
+        normalizeDetectedLine({
+          ...wall
+        })
+      )
+      .filter((wall) => {
+        const length =
+          Math.hypot(
+            wall.x2 - wall.x1,
+            wall.y2 - wall.y1
+          );
+
+        return length >= 5;
+      });
+
+  const horizontalWalls =
+    normalizedWalls.filter(
+      (wall) =>
+        wall.orientation ===
+        'horizontal'
+    );
+
+  const verticalWalls =
+    normalizedWalls.filter(
+      (wall) =>
+        wall.orientation ===
+        'vertical'
+    );
+
+  snapParallelWallAxes(
+    horizontalWalls,
+    'horizontal',
+    axisTolerance
+  );
+
+  snapParallelWallAxes(
+    verticalWalls,
+    'vertical',
+    axisTolerance
+  );
+
+  const mergedHorizontal =
+    mergeCollinearRoomWalls(
+      horizontalWalls,
+      'horizontal',
+      maximumGap
+    );
+
+  const mergedVertical =
+    mergeCollinearRoomWalls(
+      verticalWalls,
+      'vertical',
+      maximumGap
+    );
+
+  return [
+    ...mergedHorizontal,
+    ...mergedVertical
+  ];
+}
+
+function snapParallelWallAxes(
+  walls,
+  orientation,
+  tolerance
+) {
+  if (
+    !Array.isArray(walls) ||
+    walls.length < 2
+  ) {
+    return;
+  }
+
+  const coordinateName =
+    orientation === 'horizontal'
+      ? 'y1'
+      : 'x1';
+
+  const sortedWalls =
+    [...walls].sort(
+      (wallA, wallB) =>
+        wallA[coordinateName] -
+        wallB[coordinateName]
+    );
+
+  const groups = [];
+
+  sortedWalls.forEach((wall) => {
+    const coordinate =
+      wall[coordinateName];
+
+    let matchingGroup =
+      groups.find((group) => {
+        return (
+          Math.abs(
+            group.average -
+            coordinate
+          ) <= tolerance
+        );
+      });
+
+    if (!matchingGroup) {
+      matchingGroup = {
+        walls: [],
+        average: coordinate
+      };
+
+      groups.push(
+        matchingGroup
+      );
+    }
+
+    matchingGroup.walls.push(
+      wall
+    );
+
+    matchingGroup.average =
+      matchingGroup.walls.reduce(
+        (sum, groupedWall) => {
+          return (
+            sum +
+            groupedWall[
+              coordinateName
+            ]
+          );
+        },
+        0
+      ) /
+      matchingGroup.walls.length;
+  });
+
+  groups.forEach((group) => {
+    const snappedCoordinate =
+      Math.round(
+        group.average
+      );
+
+    group.walls.forEach((wall) => {
+      if (
+        orientation ===
+        'horizontal'
+      ) {
+        wall.y1 =
+          snappedCoordinate;
+
+        wall.y2 =
+          snappedCoordinate;
+      } else {
+        wall.x1 =
+          snappedCoordinate;
+
+        wall.x2 =
+          snappedCoordinate;
+      }
+    });
+  });
+}
+
+function mergeCollinearRoomWalls(
+  walls,
+  orientation,
+  maximumGap
+) {
+  if (
+    !Array.isArray(walls) ||
+    !walls.length
+  ) {
+    return [];
+  }
+
+  const groupedWalls =
+    new Map();
+
+  walls.forEach((wall) => {
+    const axis =
+      orientation === 'horizontal'
+        ? Math.round(wall.y1)
+        : Math.round(wall.x1);
+
+    const group =
+      groupedWalls.get(axis) || [];
+
+    group.push({
+      ...wall
+    });
+
+    groupedWalls.set(
+      axis,
+      group
+    );
+  });
+
+  const mergedWalls = [];
+
+  groupedWalls.forEach(
+    (group, axis) => {
+      const sortedGroup =
+        group.sort(
+          (wallA, wallB) => {
+            const startA =
+              orientation ===
+              'horizontal'
+                ? Math.min(
+                    wallA.x1,
+                    wallA.x2
+                  )
+                : Math.min(
+                    wallA.y1,
+                    wallA.y2
+                  );
+
+            const startB =
+              orientation ===
+              'horizontal'
+                ? Math.min(
+                    wallB.x1,
+                    wallB.x2
+                  )
+                : Math.min(
+                    wallB.y1,
+                    wallB.y2
+                  );
+
+            return startA - startB;
+          }
+        );
+
+      let currentWall = null;
+
+      sortedGroup.forEach(
+        (wall) => {
+          const start =
+            orientation ===
+            'horizontal'
+              ? Math.min(
+                  wall.x1,
+                  wall.x2
+                )
+              : Math.min(
+                  wall.y1,
+                  wall.y2
+                );
+
+          const end =
+            orientation ===
+            'horizontal'
+              ? Math.max(
+                  wall.x1,
+                  wall.x2
+                )
+              : Math.max(
+                  wall.y1,
+                  wall.y2
+                );
+
+          if (!currentWall) {
+            currentWall = {
+              start,
+              end
+            };
+
+            return;
+          }
+
+          const gap =
+            start -
+            currentWall.end;
+
+          if (
+            gap <= maximumGap
+          ) {
+            currentWall.end =
+              Math.max(
+                currentWall.end,
+                end
+              );
+
+            return;
+          }
+
+          mergedWalls.push(
+            createMergedRoomWall(
+              orientation,
+              axis,
+              currentWall.start,
+              currentWall.end
+            )
+          );
+
+          currentWall = {
+            start,
+            end
+          };
+        }
+      );
+
+      if (currentWall) {
+        mergedWalls.push(
+          createMergedRoomWall(
+            orientation,
+            axis,
+            currentWall.start,
+            currentWall.end
+          )
+        );
+      }
+    }
+  );
+
+  return mergedWalls;
+}
+
+function createMergedRoomWall(
+  orientation,
+  axis,
+  start,
+  end
+) {
+  if (
+    orientation ===
+    'horizontal'
+  ) {
+    return {
+      x1: start,
+      y1: axis,
+      x2: end,
+      y2: axis,
+      orientation:
+        'horizontal'
+    };
+  }
+
+  return {
+    x1: axis,
+    y1: start,
+    x2: axis,
+    y2: end,
+    orientation:
+      'vertical'
+  };
+}
+
+function filterWallsToDetectionArea(
+  walls,
+  detectionArea
+) {
+  if (
+    !detectionArea
+  ) {
+    return walls;
+  }
+
+  const areaLeft =
+    detectionArea.x;
+
+  const areaTop =
+    detectionArea.y;
+
+  const areaRight =
+    detectionArea.x +
+    detectionArea.width;
+
+  const areaBottom =
+    detectionArea.y +
+    detectionArea.height;
+
+  return walls
+    .map((wall) => {
+      if (
+        wall.orientation ===
+        'horizontal'
+      ) {
+        if (
+          wall.y1 < areaTop ||
+          wall.y1 > areaBottom
+        ) {
+          return null;
+        }
+
+        const startX =
+          Math.max(
+            Math.min(
+              wall.x1,
+              wall.x2
+            ),
+            areaLeft
+          );
+
+        const endX =
+          Math.min(
+            Math.max(
+              wall.x1,
+              wall.x2
+            ),
+            areaRight
+          );
+
+        if (
+          endX <= startX
+        ) {
+          return null;
+        }
+
+        return {
+          ...wall,
+          x1: startX,
+          x2: endX,
+          y1: wall.y1,
+          y2: wall.y1
+        };
+      }
+
+      if (
+        wall.x1 < areaLeft ||
+        wall.x1 > areaRight
+      ) {
+        return null;
+      }
+
+      const startY =
+        Math.max(
+          Math.min(
+            wall.y1,
+            wall.y2
+          ),
+          areaTop
+        );
+
+      const endY =
+        Math.min(
+          Math.max(
+            wall.y1,
+            wall.y2
+          ),
+          areaBottom
+        );
+
+      if (
+        endY <= startY
+      ) {
+        return null;
+      }
+
+      return {
+        ...wall,
+        x1: wall.x1,
+        x2: wall.x1,
+        y1: startY,
+        y2: endY
+      };
+    })
+    .filter(Boolean);
+}
+
+function detectRoomContoursFromWalls(
+  walls,
+  imageWidth,
+  imageHeight,
+  detectionArea
+) {
+  if (
+    !window.cv ||
+    typeof window.cv.Mat !==
+      'function'
+  ) {
+    throw new Error(
+      'OpenCV ist noch nicht vollständig geladen.'
+    );
+  }
+
+  const cv =
+    window.cv;
+
+  const pixelsPerMeter =
+    getTemplateImagePixelsPerMeter();
+
+  const wallThickness =
+    Math.max(
+      3,
+      Math.round(
+        ROOM_DETECTION_SETTINGS
+          .wallThicknessMeters *
+          pixelsPerMeter
+      )
+    );
+
+  let wallMask = null;
+  let freeMask = null;
+  let labels = null;
+  let stats = null;
+  let centroids = null;
+
+  try {
+    wallMask =
+      cv.Mat.zeros(
+        imageHeight,
+        imageWidth,
+        cv.CV_8UC1
+      );
+
+    /*
+     * Wandlinien weiß in die ansonsten
+     * schwarze Maske zeichnen.
+     */
+    walls.forEach((wall) => {
+      cv.line(
+        wallMask,
+
+        new cv.Point(
+          Math.round(wall.x1),
+          Math.round(wall.y1)
+        ),
+
+        new cv.Point(
+          Math.round(wall.x2),
+          Math.round(wall.y2)
+        ),
+
+        new cv.Scalar(
+          255,
+          255,
+          255,
+          255
+        ),
+
+        wallThickness,
+
+        cv.LINE_8
+      );
+    });
+
+    /*
+     * Wenn ein Erkennungsbereich vorhanden ist,
+     * wird dessen Rand ebenfalls geschlossen.
+     * Dadurch gilt der Bereich als künstliche
+     * äußere Begrenzung.
+     */
+    if (detectionArea) {
+      cv.rectangle(
+        wallMask,
+
+        new cv.Point(
+          Math.round(
+            detectionArea.x
+          ),
+          Math.round(
+            detectionArea.y
+          )
+        ),
+
+        new cv.Point(
+          Math.round(
+            detectionArea.x +
+            detectionArea.width
+          ),
+          Math.round(
+            detectionArea.y +
+            detectionArea.height
+          )
+        ),
+
+        new cv.Scalar(
+          255,
+          255,
+          255,
+          255
+        ),
+
+        wallThickness,
+
+        cv.LINE_8
+      );
+    }
+
+    /*
+     * Freie Flächen weiß darstellen.
+     */
+    freeMask =
+      new cv.Mat();
+
+    cv.bitwise_not(
+      wallMask,
+      freeMask
+    );
+
+    labels =
+      new cv.Mat();
+
+    stats =
+      new cv.Mat();
+
+    centroids =
+      new cv.Mat();
+
+    const componentCount =
+      cv.connectedComponentsWithStats(
+        freeMask,
+        labels,
+        stats,
+        centroids,
+        8,
+        cv.CV_32S
+      );
+
+    const roomContours = [];
+
+    for (
+      let labelIndex = 1;
+      labelIndex < componentCount;
+      labelIndex++
+    ) {
+      const left =
+        stats.intAt(
+          labelIndex,
+          cv.CC_STAT_LEFT
+        );
+
+      const top =
+        stats.intAt(
+          labelIndex,
+          cv.CC_STAT_TOP
+        );
+
+      const width =
+        stats.intAt(
+          labelIndex,
+          cv.CC_STAT_WIDTH
+        );
+
+      const height =
+        stats.intAt(
+          labelIndex,
+          cv.CC_STAT_HEIGHT
+        );
+
+      const componentAreaPixels =
+        stats.intAt(
+          labelIndex,
+          cv.CC_STAT_AREA
+        );
+
+      /*
+       * Jede Fläche, die den äußeren Bildrand
+       * berührt, ist Außenbereich.
+       */
+      const touchesImageBorder =
+        left <= 1 ||
+        top <= 1 ||
+        left + width >=
+          imageWidth - 1 ||
+        top + height >=
+          imageHeight - 1;
+
+      if (
+        touchesImageBorder
+      ) {
+        continue;
+      }
+
+      const areaSquareMeters =
+        componentAreaPixels /
+        (
+          pixelsPerMeter *
+          pixelsPerMeter
+        );
+
+      if (
+        areaSquareMeters <
+          ROOM_DETECTION_SETTINGS
+            .minimumRoomAreaSquareMeters ||
+        areaSquareMeters >
+          ROOM_DETECTION_SETTINGS
+            .maximumRoomAreaSquareMeters
+      ) {
+        continue;
+      }
+
+      const contour =
+        extractContourForComponent(
+          labels,
+          labelIndex
+        );
+
+      if (
+        contour &&
+        contour.length >= 4
+      ) {
+        roomContours.push(
+          contour
+        );
+      }
+    }
+
+    return roomContours;
+  } finally {
+    wallMask?.delete();
+    freeMask?.delete();
+    labels?.delete();
+    stats?.delete();
+    centroids?.delete();
+  }
+}
+
+function extractContourForComponent(
+  labels,
+  labelIndex
+) {
+  const cv =
+    window.cv;
+
+  let componentMask = null;
+  let contours = null;
+  let hierarchy = null;
+  let approximatedContour = null;
+
+  try {
+    componentMask =
+      cv.Mat.zeros(
+        labels.rows,
+        labels.cols,
+        cv.CV_8UC1
+      );
+
+    for (
+      let row = 0;
+      row < labels.rows;
+      row++
+    ) {
+      for (
+        let column = 0;
+        column < labels.cols;
+        column++
+      ) {
+        if (
+          labels.intAt(
+            row,
+            column
+          ) === labelIndex
+        ) {
+          componentMask.ucharPtr(
+            row,
+            column
+          )[0] = 255;
+        }
+      }
+    }
+
+    contours =
+      new cv.MatVector();
+
+    hierarchy =
+      new cv.Mat();
+
+    cv.findContours(
+      componentMask,
+      contours,
+      hierarchy,
+      cv.RETR_EXTERNAL,
+      cv.CHAIN_APPROX_SIMPLE
+    );
+
+    if (
+      contours.size() === 0
+    ) {
+      return null;
+    }
+
+    let largestContour = null;
+    let largestArea = 0;
+
+    for (
+      let index = 0;
+      index < contours.size();
+      index++
+    ) {
+      const contour =
+        contours.get(index);
+
+      const contourArea =
+        Math.abs(
+          cv.contourArea(
+            contour,
+            false
+          )
+        );
+
+      if (
+        contourArea >
+        largestArea
+      ) {
+        largestContour?.delete();
+
+        largestContour =
+          contour.clone();
+
+        largestArea =
+          contourArea;
+      }
+
+      contour.delete();
+    }
+
+    if (!largestContour) {
+      return null;
+    }
+
+    approximatedContour =
+      new cv.Mat();
+
+    const perimeter =
+      cv.arcLength(
+        largestContour,
+        true
+      );
+
+    cv.approxPolyDP(
+      largestContour,
+      approximatedContour,
+      Math.max(
+        1.5,
+        perimeter *
+          ROOM_DETECTION_SETTINGS
+            .contourApproximationFactor
+      ),
+      true
+    );
+
+    largestContour.delete();
+
+    const points = [];
+
+    for (
+      let index = 0;
+      index <
+        approximatedContour.rows;
+      index++
+    ) {
+      points.push({
+        x:
+          approximatedContour.intAt(
+            index,
+            0
+          ),
+
+        y:
+          approximatedContour.intAt(
+            index,
+            1
+          )
+      });
+    }
+
+    return normalizeDetectedRoomContour(
+      points
+    );
+  } finally {
+    componentMask?.delete();
+    contours?.delete();
+    hierarchy?.delete();
+    approximatedContour?.delete();
+  }
+}
+
+function normalizeDetectedRoomContour(
+  points
+) {
+  if (
+    !Array.isArray(points) ||
+    points.length < 3
+  ) {
+    return [];
+  }
+
+  const pixelsPerMeter =
+    getTemplateImagePixelsPerMeter();
+
+  const tolerance =
+    Math.max(
+      2,
+      ROOM_DETECTION_SETTINGS
+        .axisToleranceMeters *
+        pixelsPerMeter
+    );
+
+  const normalized =
+    points.map((point) => ({
+      x: Math.round(point.x),
+      y: Math.round(point.y)
+    }));
+
+  /*
+   * Fast waagerechte oder senkrechte
+   * Punktfolgen begradigen.
+   */
+  for (
+    let index = 0;
+    index < normalized.length;
+    index++
+  ) {
+    const current =
+      normalized[index];
+
+    const next =
+      normalized[
+        (index + 1) %
+        normalized.length
+      ];
+
+    const deltaX =
+      Math.abs(
+        next.x - current.x
+      );
+
+    const deltaY =
+      Math.abs(
+        next.y - current.y
+      );
+
+    if (
+      deltaY <= tolerance &&
+      deltaX > deltaY
+    ) {
+      const averageY =
+        Math.round(
+          (
+            current.y +
+            next.y
+          ) / 2
+        );
+
+      current.y =
+        averageY;
+
+      next.y =
+        averageY;
+    } else if (
+      deltaX <= tolerance &&
+      deltaY > deltaX
+    ) {
+      const averageX =
+        Math.round(
+          (
+            current.x +
+            next.x
+          ) / 2
+        );
+
+      current.x =
+        averageX;
+
+      next.x =
+        averageX;
+    }
+  }
+
+  return simplifyOrthogonalPoints(
+    normalized
+  );
+}
+
+function templatePointToWorkspacePoint(
+  point
+) {
+  const template =
+    getActiveTemplate();
+
+  const scale =
+    Number(template.scale) || 1;
+
+  return {
+    x:
+      Number(template.x) +
+      point.x * scale,
+
+    y:
+      Number(template.y) +
+      point.y * scale
+  };
+}
+
+function templateContourToRoomShape(
+  contour
+) {
+  const workspacePoints =
+    contour.map(
+      templatePointToWorkspacePoint
+    );
+
+  const simplifiedPoints =
+    simplifyOrthogonalPoints(
+      workspacePoints
+    );
+
+  if (
+    simplifiedPoints.length < 3
+  ) {
+    return null;
+  }
+
+  if (
+    polygonHasSelfIntersections(
+      simplifiedPoints
+    )
+  ) {
+    return null;
+  }
+
+  const shape =
+    createPolygonShape(
+      simplifiedPoints
+    );
+
+  if (
+    !shape ||
+    shape.width < 5 ||
+    shape.height < 5
+  ) {
+    return null;
+  }
+
+  return shape;
+}
+
+function createDetectedRoomObject(
+  shape,
+  roomNumber
+) {
+  const area =
+    Number(shape.area) || 0;
+
+  const room = {
+    name:
+      'Erkannter Raum ' +
+      roomNumber,
+
+    /*
+     * Technische Standardwerte, damit der
+     * Raum sofort mit den bestehenden
+     * Editorfunktionen kompatibel ist.
+     *
+     * Diese Werte können anschließend im
+     * Haupt-Konfigurator geändert werden.
+     */
+    function:
+      'Wohnraum',
+
+    temperature: 20,
+
+    spacing:
+      'VA 150',
+
+    area:
+      area.toFixed(2),
+
+    estrich: '',
+
+    floorCovering: '',
+
+    floorplan: {
+      shapeType:
+        'polygon',
+
+      x:
+        shape.x,
+
+      y:
+        shape.y,
+
+      width:
+        shape.width,
+
+      height:
+        shape.height,
+
+      points:
+        shape.points,
+
+      doorEnabled:
+        false,
+
+      doorSide:
+        'bottom',
+
+      doorPosition:
+        50,
+
+      doorWidth:
+        90,
+
+      /*
+       * Kennzeichnung für spätere
+       * Auswertungen oder erneute Erkennung.
+       */
+      generatedFromWalls:
+        true
+    }
+  };
+
+  calculateDrawnTechnicalValues(
+    room
+  );
+
+  return room;
+}
+
+function areRoomShapesNearlyEqual(
+  shapeA,
+  shapeB
+) {
+  if (
+    !shapeA ||
+    !shapeB
+  ) {
+    return false;
+  }
+
+  const centerAX =
+    shapeA.x +
+    shapeA.width / 2;
+
+  const centerAY =
+    shapeA.y +
+    shapeA.height / 2;
+
+  const centerBX =
+    shapeB.x +
+    shapeB.width / 2;
+
+  const centerBY =
+    shapeB.y +
+    shapeB.height / 2;
+
+  const centerDistance =
+    Math.hypot(
+      centerAX - centerBX,
+      centerAY - centerBY
+    );
+
+  const areaA =
+    Number(shapeA.area) || 0;
+
+  const areaB =
+    Number(shapeB.area) || 0;
+
+  const maximumArea =
+    Math.max(
+      areaA,
+      areaB,
+      0.01
+    );
+
+  const areaDifference =
+    Math.abs(
+      areaA - areaB
+    ) /
+    maximumArea;
+
+  return (
+    centerDistance <= 10 &&
+    areaDifference <= 0.05
+  );
+}
+
+function removeDuplicateRoomShapes(
+  shapes
+) {
+  const uniqueShapes = [];
+
+  shapes.forEach((shape) => {
+    const duplicate =
+      uniqueShapes.some(
+        (existingShape) =>
+          areRoomShapesNearlyEqual(
+            existingShape,
+            shape
+          )
+      );
+
+    if (!duplicate) {
+      uniqueShapes.push(
+        shape
+      );
+    }
+  });
+
+  return uniqueShapes;
+}
+
+function createRoomsFromDetectedWalls() {
+  const template =
+    getActiveTemplate();
+
+  const floor =
+    floorData[
+      activeFloorIndex
+    ];
+
+  if (
+    !window.openCvReady ||
+    !window.cv ||
+    typeof window.cv.Mat !==
+      'function'
+  ) {
+    alert(
+      'Die Bilderkennung ist noch nicht vollständig bereit.'
+    );
+
+    return;
+  }
+
+  if (
+    !Array.isArray(
+      template.detectedWalls
+    ) ||
+    template.detectedWalls.length < 4
+  ) {
+    alert(
+      'Für die Raumerkennung sind nicht genügend Wandlinien vorhanden.'
+    );
+
+    return;
+  }
+
+  const templateImage =
+    document.querySelector(
+      '#templateLayer .template-image'
+    );
+
+  if (
+    !templateImage ||
+    !templateImage.naturalWidth ||
+    !templateImage.naturalHeight
+  ) {
+    alert(
+      'Die Grundrissvorlage ist noch nicht vollständig geladen.'
+    );
+
+    return;
+  }
+
+  /*
+   * Laufende Linienbearbeitung sauber beenden.
+   */
+  finishDetectedWallEditing();
+
+  let preparedWalls =
+    prepareWallsForRoomDetection(
+      template.detectedWalls
+    );
+
+  preparedWalls =
+    filterWallsToDetectionArea(
+      preparedWalls,
+      template.detectionArea
+    );
+
+  if (
+    preparedWalls.length < 4
+  ) {
+    alert(
+      'Nach der Bereinigung sind nicht genügend geeignete Wandlinien vorhanden.'
+    );
+
+    return;
+  }
+
+  let contours;
+
+  try {
+    contours =
+      detectRoomContoursFromWalls(
+        preparedWalls,
+        templateImage.naturalWidth,
+        templateImage.naturalHeight,
+        template.detectionArea
+      );
+  } catch (error) {
+    console.error(
+      'Fehler bei der Raumerkennung:',
+      error
+    );
+
+    alert(
+      'Die Räume konnten nicht erkannt werden.\\n\\n' +
+      (
+        error instanceof Error
+          ? error.message
+          : String(error)
+      )
+    );
+
+    return;
+  }
+
+  const detectedShapes =
+    removeDuplicateRoomShapes(
+      contours
+        .map(
+          templateContourToRoomShape
+        )
+        .filter(Boolean)
+        .filter((shape) => {
+          const area =
+            Number(shape.area) || 0;
+
+          return (
+            area >=
+              ROOM_DETECTION_SETTINGS
+                .minimumRoomAreaSquareMeters &&
+            area <=
+              ROOM_DETECTION_SETTINGS
+                .maximumRoomAreaSquareMeters
+          );
+        })
+    );
+
+  if (
+    !detectedShapes.length
+  ) {
+    alert(
+      'Es konnten keine geschlossenen Räume erkannt werden.\\n\\n' +
+      'Bitte prüfen Sie insbesondere die Außenwände, Raumecken und größere Unterbrechungen.'
+    );
+
+    return;
+  }
+
+  const existingGeneratedRooms =
+    floor.rooms.filter(
+      (room) =>
+        room.floorplan
+          ?.generatedFromWalls
+    );
+
+  let replaceGeneratedRooms =
+    false;
+
+  if (
+    existingGeneratedRooms.length
+  ) {
+    replaceGeneratedRooms =
+      confirm(
+        'Auf dieser Etage sind bereits automatisch erzeugte Räume vorhanden.\\n\\n' +
+        'OK: Vorhandene automatisch erzeugte Räume ersetzen.\\n' +
+        'Abbrechen: Neue Räume zusätzlich anlegen.'
+      );
+  }
+
+  if (
+    replaceGeneratedRooms
+  ) {
+    const generatedIndexes =
+      floor.rooms
+        .map(
+          (room, index) => ({
+            room,
+            index
+          })
+        )
+        .filter(
+          (entry) =>
+            entry.room.floorplan
+              ?.generatedFromWalls
+        )
+        .map(
+          (entry) =>
+            entry.index
+        )
+        .sort(
+          (indexA, indexB) =>
+            indexB - indexA
+        );
+
+    for (
+      const roomIndex of
+      generatedIndexes
+    ) {
+      const deleted =
+        window.opener &&
+        typeof window.opener
+          .deleteRoomFromFloorplan ===
+          'function'
+          ? window.opener
+              .deleteRoomFromFloorplan(
+                activeFloorIndex,
+                roomIndex
+              )
+          : false;
+
+      if (deleted) {
+        floor.rooms.splice(
+          roomIndex,
+          1
+        );
+      }
+    }
+  }
+
+  const newlyCreatedRooms = [];
+
+  detectedShapes.forEach(
+    (shape, index) => {
+      const room =
+        createDetectedRoomObject(
+          shape,
+          index + 1
+        );
+
+      const savedInMainWindow =
+        window.opener &&
+        typeof window.opener
+          .addRoomFromFloorplan ===
+          'function'
+          ? window.opener
+              .addRoomFromFloorplan(
+                activeFloorIndex,
+                room
+              )
+          : false;
+
+      if (
+        savedInMainWindow
+      ) {
+        floor.rooms.push(
+          room
+        );
+
+        newlyCreatedRooms.push(
+          room
+        );
+      }
+    }
+  );
+
+  if (
+    !newlyCreatedRooms.length
+  ) {
+    alert(
+      'Die Räume wurden erkannt, konnten aber nicht in den Haupt-Konfigurator übernommen werden.'
+    );
+
+    return;
+  }
+
+  renderFloor();
+
+  const firstNewRoomIndex =
+    floor.rooms.length -
+    newlyCreatedRooms.length;
+
+  selectRoom(
+    firstNewRoomIndex
+  );
+
+  alert(
+    newlyCreatedRooms.length +
+    (
+      newlyCreatedRooms.length === 1
+        ? ' Raum wurde'
+        : ' Räume wurden'
+    ) +
+    ' aus den Wandlinien erzeugt.\\n\\n' +
+    'Die Raumbezeichnungen und technischen Angaben können nun wie gewohnt bearbeitet werden.'
+  );
 }
 
 function isOpenCvAvailable() {
@@ -6111,6 +7653,38 @@ function getPixelsPerMeter() {
   return Number(template.pixelsPerMeter) || DEFAULT_PIXELS_PER_METER;
 }
 
+function getTemplateImagePixelsPerMeter() {
+  const template =
+    getActiveTemplate();
+
+  const workspacePixelsPerMeter =
+    getPixelsPerMeter();
+
+  const scale =
+    Number(template.scale) || 1;
+
+  if (
+    !Number.isFinite(
+      workspacePixelsPerMeter
+    ) ||
+    workspacePixelsPerMeter <= 0 ||
+    !Number.isFinite(scale) ||
+    scale <= 0
+  ) {
+    return DEFAULT_PIXELS_PER_METER;
+  }
+
+  /*
+   * detectedWalls liegen in den ursprünglichen
+   * Bildkoordinaten. Deshalb muss die sichtbare
+   * Skalierung herausgerechnet werden.
+   */
+  return (
+    workspacePixelsPerMeter /
+    scale
+  );
+}
+
 function pixelsToMeters(pixels) {
   return pixels / getPixelsPerMeter();
 }
@@ -6515,6 +8089,24 @@ const detectionAreaStatus =
   '>' +
     'Bearbeitung beenden' +
   '</button>' +
+
+'<div class="wall-detection-button-row">' +
+
+  '<button ' +
+    'id="createRoomsFromWallsBtn" ' +
+    'type="button" ' +
+    (
+      Array.isArray(template.detectedWalls) &&
+      template.detectedWalls.length
+        ? ''
+        : 'disabled'
+    ) +
+  '>' +
+    'Räume aus Linien erzeugen' +
+  '</button>' +
+
+'</div>' +
+
 '</div>' +
 '</div>' +
 
@@ -6597,6 +8189,15 @@ document
   ?.addEventListener(
     'click',
     finishDetectedWallEditing
+  );
+
+  document
+  .getElementById(
+    'createRoomsFromWallsBtn'
+  )
+  ?.addEventListener(
+    'click',
+    createRoomsFromDetectedWalls
   );
 
   document
