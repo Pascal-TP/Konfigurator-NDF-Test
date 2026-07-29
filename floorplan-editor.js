@@ -207,35 +207,7 @@ function openFloorplanWindow() {
     if (window.openCvReady) {
       return;
     }
-
-    /*
-     * Einige OpenCV-Versionen stellen cv
-     * zunächst als Promise bereit.
-     */
-    if (
-      window.cv &&
-      typeof window.cv.then === 'function'
-    ) {
-      window.cv
-        .then((resolvedCv) => {
-          window.cv = resolvedCv;
-          waitForOpenCvRuntime();
-        })
-        .catch((error) => {
-          console.error(
-            'OpenCV konnte nicht initialisiert werden:',
-            error
-          );
-
-          setOpenCvStatus(
-            'Bilderkennung konnte nicht geladen werden.',
-            'warning'
-          );
-        });
-
-      return;
-    }
-
+   
     if (testOpenCvRuntime()) {
       markOpenCvReady();
       return;
@@ -3817,7 +3789,7 @@ saveTemplateToMainWindow();
     : String(error);
 
 alert(
-  'Die Vorlage konnte nicht analysiert werden.\n\n' +
+  'Die Vorlage konnte nicht analysiert werden.\\n\\n' +
   'Technischer Hinweis: ' +
   errorMessage
 );
