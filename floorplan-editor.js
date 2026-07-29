@@ -7395,42 +7395,217 @@ function startDrag(e) {
   e.stopPropagation();
 
   const roomEl = e.currentTarget;
-  const roomIndex = Number(roomEl.dataset.roomIndex);
-  const room = floorData[activeFloorIndex].rooms[roomIndex];
+
+  const roomIndex =
+    Number(
+      roomEl.dataset.roomIndex
+    );
+
+  const room =
+    floorData[
+      activeFloorIndex
+    ].rooms[
+      roomIndex
+    ];
+
+  /*
+   * Sicherstellen, dass der Raum immer
+   * über ein Tür-Array verfügt.
+   */
+  ensureRoomDoors(room);
 
   drag = {
     room,
+    roomIndex,
     roomEl,
-    startX: e.clientX,
-    startY: e.clientY,
-    origX: room.floorplan.x,
-    origY: room.floorplan.y
+
+    startX:
+      e.clientX,
+
+    startY:
+      e.clientY,
+
+    origX:
+      room.floorplan.x,
+
+    origY:
+      room.floorplan.y,
+
+    /*
+     * Ausgangspositionen aller Türen dieses
+     * Raumes merken. Dadurch bleiben die Türen
+     * beim Verschieben relativ zum Raum stehen.
+     */
+    originalDoors:
+      room.floorplan.doors.map(
+        (door) => ({
+          id:
+            door.id,
+
+          x:
+            Number(door.x) || 0,
+
+          y:
+            Number(door.y) || 0
+        })
+      )
   };
 
-  document.addEventListener('mousemove', onDrag);
-  document.addEventListener('mouseup', stopDrag);
+  document.addEventListener(
+    'mousemove',
+    onDrag
+  );
+
+  document.addEventListener(
+    'mouseup',
+    stopDrag
+  );
 }
 
 function onDrag(e) {
-  if (!drag) return;
+  if (!drag) {
+    return;
+  }
 
-  const dx = e.clientX - drag.startX;
-  const dy = e.clientY - drag.startY;
+  const dx =
+    e.clientX -
+    drag.startX;
+
+  const dy =
+    e.clientY -
+    drag.startY;
 
   const grid = 10;
-  const newX = Math.max(0, Math.round((drag.origX + dx) / grid) * grid);
-  const newY = Math.max(0, Math.round((drag.origY + dy) / grid) * grid);
 
-  drag.room.floorplan.x = newX;
-  drag.room.floorplan.y = newY;
+  const newX =
+    Math.max(
+      0,
+      Math.round(
+        (
+          drag.origX +
+          dx
+        ) / grid
+      ) * grid
+    );
 
-  drag.roomEl.style.left = newX + 'px';
-  drag.roomEl.style.top = newY + 'px';
+  const newY =
+    Math.max(
+      0,
+      Math.round(
+        (
+          drag.origY +
+          dy
+        ) / grid
+      ) * grid
+    );
+
+  /*
+   * Tatsächliche Verschiebung verwenden.
+   * Diese kann durch Rasterfang und Begrenzung
+   * von der reinen Mausbewegung abweichen.
+   */
+  const movedX =
+    newX -
+    drag.origX;
+
+  const movedY =
+    newY -
+    drag.origY;
+
+  drag.room.floorplan.x =
+    newX;
+
+  drag.room.floorplan.y =
+    newY;
+
+  drag.roomEl.style.left =
+    newX + 'px';
+
+  drag.roomEl.style.top =
+    newY + 'px';
+
+  /*
+   * Alle Türen des Raumes um exakt denselben
+   * Wert verschieben.
+   */
+  drag.originalDoors.forEach(
+    (originalDoor) => {
+      const door =
+        drag.room.floorplan.doors.find(
+          (entry) =>
+            entry.id ===
+            originalDoor.id
+        );
+
+      if (!door) {
+        return;
+      }
+
+      door.x =
+        originalDoor.x +
+        movedX;
+
+      door.y =
+        originalDoor.y +
+        movedY;
+
+      /*
+       * Die sichtbare Tür direkt mitbewegen,
+       * ohne während jeder Mausbewegung den
+       * gesamten Grundriss neu zu rendern.
+       */
+      const doorElement =
+        document.querySelector(
+          '.floorplan-door' +
+          '[data-room-index="' +
+          drag.roomIndex +
+          '"]' +
+          '[data-door-id="' +
+          door.id +
+          '"]'
+        );
+
+      if (doorElement) {
+        doorElement.style.left =
+          door.x + 'px';
+
+        doorElement.style.top =
+          door.y + 'px';
+      }
+    }
+  );
 }
 
 function stopDrag() {
-  document.removeEventListener('mousemove', onDrag);
-  document.removeEventListener('mouseup', stopDrag);
+  if (!drag) {
+    return;
+  }
+
+  /*
+   * Raumposition und alle zugehörigen
+   * Türpositionen gemeinsam speichern.
+   */
+  const saved =
+    saveRoomDoors(
+      drag.roomIndex
+    );
+
+  if (!saved) {
+    console.warn(
+      'Die neue Raum- und Türposition konnte nicht im Haupt-Konfigurator gespeichert werden.'
+    );
+  }
+
+  document.removeEventListener(
+    'mousemove',
+    onDrag
+  );
+
+  document.removeEventListener(
+    'mouseup',
+    stopDrag
+  );
+
   drag = null;
 }
 
